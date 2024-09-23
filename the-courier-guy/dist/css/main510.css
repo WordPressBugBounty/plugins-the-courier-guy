@@ -1,0 +1,39 @@
+.tcg-checkout-suburb-title {
+    display: none !important;
+}
+
+.tcg-quoteno {
+    display: none !important;
+}
+
+#billing_tcg_place_lookup_field .select2-container, #shipping_tcg_place_lookup_field .select2-container {
+    width: 100% !important;
+}
+
+#iihtcg_selector_input_collect {
+    margin-left: 5px !important;
+}
+
+#iihtcg_selector label {
+    display: inline-block;
+}
+
+.tcg-insurance-field {
+    display: block !important;
+}
+
+/* Apply CSS to evenly space the radio buttons and labels within <p> elements */
+#iihtcg_selector p {
+    margin-bottom: 10px; /* Adjust the margin as needed for spacing */
+    display: flex; /* Use flexbox for alignment */
+    align-items: center; /* Center items vertically */
+}
+
+/* Style the radio buttons and labels */
+#iihtcg_selector input[type="radio"] {
+    margin-right: 5px; /* Adjust the margin as needed for spacing */
+}
+
+#iihtcg_selector label {
+    display: inline; /* Make labels display inline with radio buttons */
+}
