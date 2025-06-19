@@ -1,9 +1,9 @@
 === The Courier Guy Shipping for WooCommerce ===
 Tags: ecommerce, e-commerce, woocommerce, shipping, courier
 Requires at least: 5.6.0
-Tested up to: 6.5.4
+Tested up to: 6.7.1
 Requires PHP: 8.0
-Stable tag: 5.1.2
+Stable tag: 5.1.3
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -379,6 +379,9 @@ We often suggest that the clients do not exclude the following shipping methods
 
 
 == Changelog ==
+= 5.1.3 - June 19, 2025
+* Changed insurance to not be included in free shipping.
+
 = 5.1.2 - July 22, 2024
 * Guzzle HTTP upgrade.
 

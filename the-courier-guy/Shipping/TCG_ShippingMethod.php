@@ -356,6 +356,16 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                             $name .= 'Fuel charge';
                         }
 
+                        $insurance_charge = 0;
+
+                        if (!empty($base_rate['extras'])) {
+                            foreach ($base_rate['extras'] as $extra) {
+                                if (isset($extra['insurance_charge'])) {
+                                    $insurance_charge += $extra['insurance_charge'];
+                                }
+                            }
+                        }
+
                         $taxes_enabled = get_option('woocommerce_calc_taxes');
                         $settings      = $this->getShippingProperties();
 
@@ -372,15 +382,16 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                         }
 
                         $rate        = [
-                            'name'            => $name,
-                            'cost'            => $ship_price,
-                            'total'           => $ship_price,
-                            'total_taxes'     => $taxes,
-                            'rate_adjustment' => $rate_adjustments_cost,
-                            'calc_tax'        => 'per_item',
-                            'service'         => $base_rate['service_level']['code'],
-                            'cartage'         => $base_rate['base_rate']['charge'],
-                            'meta_data'       => $meta_data,
+                            'name'             => $name,
+                            'cost'             => $ship_price,
+                            'total'            => $ship_price,
+                            'total_taxes'      => $taxes,
+                            'rate_adjustment'  => $rate_adjustments_cost,
+                            'calc_tax'         => 'per_item',
+                            'service'          => $base_rate['service_level']['code'],
+                            'cartage'          => $base_rate['base_rate']['charge'],
+                            'meta_data'        => $meta_data,
+                            'insurance_charge' => $insurance_charge,
                         ];
                         $baseRates[] = $rate;
                         $rates[]     = $rate;
@@ -982,8 +993,14 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                         $rate['service'],
                         $rates_for_free_shipping
                     )) {
-                    $args['label'] = $rateLabel . ': Free Shipping';
-                    $args['cost']  = 0;
+                    $insurance = $rate['insurance_charge'];
+
+                    if (!empty($package['insurance']) && $insurance > 0) {
+                        $args['label'] = $rateLabel . ': Free Shipping + Insurance ';
+                    } else {
+                        $args['label'] = $rateLabel . ': Free Shipping';
+                    }
+                    $args['cost']  = $package['insurance'] ? 0 + $insurance : 0;
                     $args['taxes'] = [1 => 0];
 
                     //The id variable must be changed, as this is used in the 'add_rate' method on the parent class WC_Shipping_Method.
