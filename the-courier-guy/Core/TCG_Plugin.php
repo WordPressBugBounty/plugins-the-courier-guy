@@ -199,18 +199,31 @@ HTML;
      */
     public function getCartTotalCost($cart)
     {
-        if ($wc_session = WC()->session) {
-            $settings = $this->getShippingMethodSettings();
-            if (isset($settings['multivendor_single_override']) && $settings['multivendor_single_override'] === 'yes') {
-                $wc_session->set('customer_cart_subtotal', $cart->get_subtotal() + $cart->get_subtotal_tax());
+        // Add a static flag to prevent recursion
+        static $isGettingCartTotalCost = false;
+
+        if ($isGettingCartTotalCost) {
+            return;
+        }
+
+        $isGettingCartTotalCost = true;
+
+        try {
+            if ($wc_session = WC()->session) {
+                $settings = $this->getShippingMethodSettings();
+                if (isset($settings['multivendor_single_override']) && $settings['multivendor_single_override'] === 'yes') {
+                    $wc_session->set('customer_cart_subtotal', $cart->get_subtotal() + $cart->get_subtotal_tax());
+                }
+                $order = wc_get_order($wc_session->get("store_api_draft_order")) ?? false;
+                if ($order) {
+                    $this->updateShippingPropertiesOnOrder($order->get_id(), []);
+                    $this->add_shipping_selector();
+                    TCG_Shipping_Method::shipLogicRateOptins();
+                    $this->updateShippingPropertiesFromCheckout();
+                }
             }
-            $order = wc_get_order($wc_session->get("store_api_draft_order")) ?? false;
-            if ($order) {
-                $this->updateShippingPropertiesOnOrder($order->get_id(), []);
-                $this->add_shipping_selector();
-                TCG_Shipping_Method::shipLogicRateOptins();
-                $this->updateShippingPropertiesFromCheckout();
-            }
+        } finally {
+            $isGettingCartTotalCost = false;
         }
     }
 
