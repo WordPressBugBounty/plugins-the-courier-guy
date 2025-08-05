@@ -9,6 +9,7 @@ require_once plugin_dir_path(__DIR__) . 'Core/ShipLogicApiPayload.php';
 use Aws\Credentials\Credentials;
 use Aws\Signature\SignatureV4;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Psr7\Request;
 use Psr\Http\Message\RequestInterface;
 
@@ -20,7 +21,7 @@ class ShipLogicApi
     private string $access_key_id;
     private string $secret_access_key;
     private string $accessBearerToken;
-    private $apiMethods = [
+    private        $apiMethods = [
         'getRates'         => [
             'method'   => 'POST',
             'endPoint' => self::API_BASE . 'rates',
@@ -67,7 +68,7 @@ class ShipLogicApi
      * @param array $data
      *
      * @return string
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function makeAPIRequest(string $apiMethod, array $data): string
     {
@@ -125,7 +126,7 @@ class ShipLogicApi
      * @param array $parameters
      *
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException|ShipLogicApiException
      */
     public function getOptInRates(array $package, array $parameters): array
     {
@@ -140,14 +141,14 @@ class ShipLogicApi
             return $optInRates;
         }
 
-        try {
+        try{
             $optInRates = $this->makeAPIRequest(
                 'getOptInRates',
                 ['body' => json_encode($body)]
             );
 
             $optInRates = json_decode($optInRates, true);
-        } catch (Exception $exception) {
+        } catch (Exception $exception){
             $optInRates = [];
         }
 
@@ -162,8 +163,8 @@ class ShipLogicApi
      * @param array $package
      * @param array $parameters
      *
-     * @return array|mixed
-     * @throws \GuzzleHttp\Exception\GuzzleException|\ShipLogicApiException
+     * @return array
+     * @throws GuzzleException|ShipLogicApiException
      */
     public function getRates(array $package, array $parameters): array
     {
@@ -188,7 +189,7 @@ class ShipLogicApi
                 $parcel->submitted_width_cm    = $parcelArray['dim2'];
                 $parcel->submitted_height_cm   = $parcelArray['dim3'];
                 $parcel->submitted_description = $this->removeTrailingComma($parcelArray['description']);
-                $parcel->item_count            = $parcelArray['itemCount'];
+                $parcel->item_count            = $parcelArray['itemCount'] ?? $parcelArray['item'];
                 $parcel->submitted_weight_kg   = wc_get_weight($parcelArray['actmass'], 'kg');
                 $parcels[]                     = $parcel;
             }
@@ -232,13 +233,13 @@ class ShipLogicApi
                 return ['rates' => $rates, 'opt_in_rates' => $optInRates];
             }
 
-            try {
+            try{
                 $response = $this->makeAPIRequest('getRates', ['body' => json_encode($body)]);
                 $rates    = json_decode($response, true);
                 if (!empty($rates['rates'])) {
                     set_transient($hash, $rates, 300);
                 }
-            } catch (Exception $exception) {
+            } catch (Exception $exception){
                 wc_clear_notices();
                 wc_add_notice($exception->getMessage(), 'error');
                 $rates = [];
@@ -265,7 +266,7 @@ class ShipLogicApi
      * @param object $body
      *
      * @return string
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function createShipment(object $body): string
     {
@@ -275,7 +276,10 @@ class ShipLogicApi
         );
     }
 
-    public function getShipmentLabel($id)
+    /**
+     * @throws GuzzleException
+     */
+    public function getShipmentLabel($id): string
     {
         return $this->makeAPIRequest('getShipmentLabel', ['param' => $id]);
     }
@@ -284,14 +288,11 @@ class ShipLogicApi
      * @param array $parameters
      *
      * @return object
-     * @throws \ShipLogicApiException
+     * @throws ShipLogicApiException
      */
     private function getSender(array $parameters): object
     {
         $states = WC()->countries->get_states($parameters['shopCountry']);
-
-        $sourceAddress = "{$parameters['shopAddress1']} {$parameters['shopSuburb']} 
-        {$parameters['shopCity']} {$parameters['shopCountry']}";
 
         $sender                 = new stdClass();
         $sender->contact_name   = $parameters['shopContactName'] ?? '';
@@ -310,14 +311,12 @@ class ShipLogicApi
      * @param array $package
      *
      * @return object
-     * @throws \ShipLogicApiException
+     * @throws ShipLogicApiException
      */
     private function getReceiver(array $package): object
     {
         $states          = WC()->countries->get_states($package['destination']['country']);
         $destination     = $package['destination'];
-        $receiverAddress = "{$destination['address']} {$destination['address_2']} 
-        {$destination['city']} {$destination['country']}";
 
         $receiver                 = new stdClass();
         $receiver->company        = $package['billing_company'] ?? '';

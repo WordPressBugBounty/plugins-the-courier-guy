@@ -84,7 +84,7 @@ class CustomPluginDependencies
         array_walk(
             $invalidatedPlugins,
             function ($invalidatedPlugin) {
-                $notice = sprintf(__($invalidatedPlugin['notice']));
+                $notice = __($invalidatedPlugin['notice'], 'the-courier-guy');
                 ?>
                 <div id="message" class="error">
                     <p>

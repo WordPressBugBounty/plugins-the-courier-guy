@@ -9,10 +9,10 @@ require_once 'ShipLogicContentPayload.php';
 
 class ShipLogicApiPayload
 {
-    public static $r1;
-    public static $j;
+    public static    $r1;
+    public static    $j;
     protected static $log;
-    public $globalFactor = 50;
+    public           $globalFactor = 50;
 
     /**
      * ShipLogicApiPayload constructor.
@@ -35,7 +35,7 @@ class ShipLogicApiPayload
      *
      * @return array
      */
-    public function getContentsPayload($parameters, $items)
+    public function getContentsPayload(array $parameters, array $items): array
     {
         $logging = $parameters['usemonolog'] === 'yes';
         if ($logging && !self::$log) {
@@ -128,7 +128,7 @@ class ShipLogicApiPayload
     /**
      * @return array
      */
-    private function getInsurancePayloadForQuote()
+    private function getInsurancePayloadForQuote(): array
     {
         global $TCG_Plugin;
         $result                   = [];
@@ -149,7 +149,7 @@ class ShipLogicApiPayload
      *
      * @return array
      */
-    private function getInsurancePayloadForCollection($order)
+    private function getInsurancePayloadForCollection(WC_Order $order): array
     {
         $result = [];
         if ($order->get_meta('_billing_insurance', true) || $order->get_meta(
@@ -172,7 +172,7 @@ class ShipLogicApiPayload
      *
      * @return array
      */
-    private function getGlobalParcels($parameters)
+    private function getGlobalParcels($parameters): array
     {
         $globalParcells = [];
         $defaultProduct = [];
@@ -224,7 +224,7 @@ class ShipLogicApiPayload
         if (count($globalParcells) > 1) {
             usort(
                 $globalParcells,
-                function ($a, $b) {
+                function ($a, $b){
                     if ($a[0] === $b[0]) {
                         return 0;
                     }
@@ -241,13 +241,13 @@ class ShipLogicApiPayload
         ];
     }
 
-    private function getAllItems($items, $defaultProduct)
+    private function getAllItems($items, $defaultProduct): array
     {
         $all_itemms = [];
         foreach ($items as $item) {
             $itm               = [];
-            $item_variation_id = isset($item['variation_id']) ? $item['variation_id'] : 0;
-            $item_product_id   = isset($item['product_id']) ? $item['product_id'] : 0;
+            $item_variation_id = $item['variation_id'] ?? 0;
+            $item_product_id   = $item['product_id'] ?? 0;
             if ($item_variation_id !== 0) {
                 $product       = new WC_Product_Variation($item_variation_id);
                 $itm['single'] = $this->isSingleProductItem($product, $item_product_id);
@@ -259,14 +259,13 @@ class ShipLogicApiPayload
             $itm['product']            = $product;
             $itm['dimensions']         = [];
             $itm['dimensions']['mass'] = $product->has_weight() ? wc_get_weight($product->get_weight(), 'kg') : 1.0;
+            $itm['has_dimensions']     = true;
             if ($product->has_dimensions()) {
-                $itm['has_dimensions']       = true;
                 $itm['toobig']               = false;
                 $itm['dimensions']['height'] = $product->get_height();
                 $itm['dimensions']['width']  = $product->get_width();
                 $itm['dimensions']['length'] = $product->get_length();
             } else {
-                $itm['has_dimensions'] = true;
                 // Set as too-big item by default
                 $itm['dimensions']['height'] = 1;
                 $itm['dimensions']['width']  = 1;
@@ -288,7 +287,7 @@ class ShipLogicApiPayload
         return $all_itemms;
     }
 
-    private function getSingleItems($all_items)
+    private function getSingleItems($all_items): array
     {
         $singleItems = [];
 
@@ -302,7 +301,7 @@ class ShipLogicApiPayload
         return [$singleItems, $all_items];
     }
 
-    private function getFittingItems($all_items, $globalParcels, $globalFlyer)
+    private function getFittingItems($all_items, $globalParcels, $globalFlyer): array
     {
         $tooBigItems  = [];
         $fittingItems = [];
@@ -324,7 +323,7 @@ class ShipLogicApiPayload
         // Order the fitting items with the biggest dimension first
         usort(
             $fittingItems,
-            function ($a, $b) use ($all_items, $fittingItems) {
+            function ($a, $b) use ($all_items, $fittingItems){
                 $itema         = $a['item'];
                 $itemb         = $b['item'];
                 $producta_size = max(
@@ -362,7 +361,7 @@ class ShipLogicApiPayload
         ];
     }
 
-    private function fitSingleItems($singleItems, $globalFlyer, &$fitsFlyer, $waybillDescriptionOverride)
+    private function fitSingleItems($singleItems, $globalFlyer, &$fitsFlyer, $waybillDescriptionOverride): int
     {
         $j = 0;
 
@@ -395,7 +394,7 @@ class ShipLogicApiPayload
         return $j;
     }
 
-    private function fitToobigItems($tooBigItems, $waybillDescriptionOverride, $j)
+    private function fitToobigItems($tooBigItems, $waybillDescriptionOverride, $j): int
     {
         foreach ($tooBigItems as $tooBigItem) {
             $j++;
@@ -433,18 +432,16 @@ class ShipLogicApiPayload
         return $j;
     }
 
-    private function array_flatten($array)
+    private function array_flatten($array): array
     {
         $flat = [];
         foreach ($array as $key => $value) {
-            array_push($flat, $key);
+            $flat[] = $key;
             foreach ($value as $val) {
-                array_push($flat, $val);
+                $flat[] = $val;
             }
         }
-        $u = array_unique($flat);
-
-        return $u;
+        return array_unique($flat);
     }
 
     /**
@@ -454,9 +451,8 @@ class ShipLogicApiPayload
      * Parameters are passed by reference, so modified in the function
      *
      * @param $fittingItems
-     * @param $items
      */
-    private function poolIfPossible(&$fittingItems)
+    private function poolIfPossible(&$fittingItems): void
     {
         $pools = [];
 
@@ -504,7 +500,9 @@ class ShipLogicApiPayload
             $fitted[$key]                               = $fittings[$k];
             $fitted[$key]['item']['slug']               = $grp_name;
             $fitted[$key]['item']['dimensions']         = $grp_dimensions;
-            $fitted[$key]['item']['dimensions']['mass'] = $grp_mass / $grp_quantity;
+            $fitted[$key]['item']['dimensions']['mass'] = (is_numeric(
+                    $grp_quantity
+                ) && $grp_quantity != 0) ? $grp_mass / $grp_quantity : 0;
             $fitted[$key]['item']['item']['quantity']   = $grp_quantity;
         }
 
@@ -513,10 +511,10 @@ class ShipLogicApiPayload
 
     /**
      * @param $product
-     *
+     * @param null $item_product_id
      * @return bool
      */
-    private function isSingleProductItem($product, $item_product_id = null)
+    private function isSingleProductItem($product, $item_product_id = null): bool
     {
         if ($item_product_id !== null) {
             $psp = get_post_meta($item_product_id, 'product_single_parcel');
@@ -524,7 +522,7 @@ class ShipLogicApiPayload
             $psp = get_post_meta($product->get_id(), 'product_single_parcel');
         }
 
-        if (is_array($psp) && count($psp) > 0) {
+        if (!empty($psp)) {
             return $psp[0] === 'on';
         }
 
@@ -537,7 +535,7 @@ class ShipLogicApiPayload
      *
      * @return array
      */
-    private function doesFitGlobalParcels($item, $globalParcels)
+    private function doesFitGlobalParcels($item, $globalParcels): array
     {
         $globalParcelIndex = 0;
         foreach ($globalParcels as $globalParcel) {
@@ -557,7 +555,7 @@ class ShipLogicApiPayload
      *
      * @return bool
      */
-    private function doesFitParcel($item, $parcel)
+    private function doesFitParcel($item, $parcel): bool
     {
         // Parcel now has volume as element - need to drop before sorting
         unset($parcel['volume']);
@@ -587,11 +585,11 @@ class ShipLogicApiPayload
     /**
      * @param array $shippingItem
      *
-     * @return mixed
+     * @return string
      */
     private function getServiceIdentifierFromShippingItem(
-        $shippingItem
-    ) {
+        array $shippingItem
+    ): string{
         $method      = $shippingItem['method_id'];
         $methodParts = explode(':', $method);
 

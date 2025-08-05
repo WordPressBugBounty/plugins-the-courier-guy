@@ -170,7 +170,7 @@ class CustomPostType
                     remove_meta_box('postimagediv', 'rotator', 'side');
                     add_meta_box(
                         'postimagediv',
-                        __($properties['display_name']),
+                        __($properties['display_name'], 'the-courier-guy'),
                         'post_thumbnail_meta_box',
                         $postTypeIdentifier,
                         'side',
@@ -383,17 +383,17 @@ class CustomPostType
             }
             $options['label']  = $displayNamePlural;
             $options['labels'] = [
-                'name'                  => __($displayNamePlural, ''),
-                'singular_name'         => __($displayName, ''),
-                'search_items'          => __('Search ' . $displayNamePlural, ''),
-                'all_items'             => __('All ' . $displayNamePlural, ''),
-                'parent_item'           => __('Parent ' . $displayName, ''),
-                'parent_item_colon'     => __('Parent ' . $displayName . ':', ''),
-                'edit_item'             => __('Edit ' . $displayName, ''),
-                'update_item'           => __('Update ' . $displayName, ''),
-                'add_new_item'          => __('Add New ' . $displayName, ''),
-                'new_item_name'         => __('New ' . $displayName, ''),
-                'choose_from_most_used' => __('Choose from the most used ' . $displayNamePlural, '')
+                'name'                  => __($displayNamePlural, 'the-courier-guy'),
+                'singular_name'         => __($displayName, 'the-courier-guy'),
+                'search_items'          => __('Search ' . $displayNamePlural, 'the-courier-guy'),
+                'all_items'             => __('All ' . $displayNamePlural, 'the-courier-guy'),
+                'parent_item'           => __('Parent ' . $displayName, 'the-courier-guy'),
+                'parent_item_colon'     => __('Parent ' . $displayName . ':', 'the-courier-guy'),
+                'edit_item'             => __('Edit ' . $displayName, 'the-courier-guy'),
+                'update_item'           => __('Update ' . $displayName, 'the-courier-guy'),
+                'add_new_item'          => __('Add New ' . $displayName, 'the-courier-guy'),
+                'new_item_name'         => __('New ' . $displayName, 'the-courier-guy'),
+                'choose_from_most_used' => __('Choose from the most used ' . $displayNamePlural, 'the-courier-guy')
             ];
         }
 

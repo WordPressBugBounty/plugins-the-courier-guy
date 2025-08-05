@@ -51,8 +51,8 @@ class TCG_Shipping_Method extends WC_Shipping_Method
             'instance-settings',
         ];
         $this->tax_status         = false;
-        $this->method_title       = __('The Courier Guy');
-        $this->method_description = __('The Official Courier Guy shipping method.');
+        $this->method_title       = __('The Courier Guy', 'the-courier-guy');
+        $this->method_description = __('The Official Courier Guy shipping method.', 'the-courier-guy');
         $this->overrideFormFieldsVariable();
 
         if (!empty($instance_id)) {
@@ -71,7 +71,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
 
         $this->parameters = $this->getShippingProperties();
         if (is_array($this->parameters) && count($this->parameters) > 0) {
-            $this->logging = isset($this->parameters['usemonolog']) ? $this->parameters['usemonolog'] === 'yes' : false;
+            $this->logging = isset($this->parameters['usemonolog']) && $this->parameters['usemonolog'] === 'yes';
             if ($this->logging && self::$log === null) {
                 self::$log = wc_get_logger();
             }
@@ -218,7 +218,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
     /**
      * @param array|null $settings
      *
-     * @return void
+     * @return array|null
      */
     public function setShipLogicApiCredentials(?array $settings = [])
     {
@@ -295,9 +295,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
             }
         }
 
-        if (self::$log) {
-            self::$log->add('thecourierguy', 'Calculate_shipping package: ' . json_encode($package));
-        }
+        self::$log?->add('thecourierguy', 'Calculate_shipping package: ' . json_encode($package));
 
         $vendor_id = '';
         if (isset($package['vendor_id'])) {
@@ -397,10 +395,9 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                         $rates[]     = $rate;
                     }
                 }
-                if (self::$log) {
-                    self::$log->add('thecourierguy', 'Calculate_shipping result: ' . json_encode($result));
-                }
-                if (isset($result['error']) && strpos($result['message'], 'Too Long') !== false) {
+                self::$log?->add('thecourierguy', 'Calculate_shipping result: ' . json_encode($result));
+
+                if (isset($result['error']) && str_contains($result['message'], 'Too Long')) {
                     wc_clear_notices();
                     wc_add_notice('Too many items for TCG. Please split your order', 'error');
                     $haveResult = true;
@@ -437,7 +434,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
     public static function is_woocommerce_blocks_checkout()
     {
         $content = get_the_content();
-        if (strpos($content, 'wp-block-woocommerce-checkout') !== false) {
+        if (str_contains($content, 'wp-block-woocommerce-checkout')) {
             return true;
         }
 
@@ -493,7 +490,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                     <select class="select <?php
                     echo esc_attr($data['class']); ?>" style="<?php
                     echo esc_attr($data['css']); ?>" <?php
-                    disabled($data['disabled'], true); ?> <?php
+                    disabled($data['disabled']); ?> <?php
                     echo $this->get_custom_attribute_html($data); // WPCS: XSS ok.
                     ?>>
                         <option value="">Select a Service</option>
@@ -532,7 +529,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                             <input data-service-id="<?php
                             echo esc_attr($option_key); ?>" class="<?= $class; ?> input-text regular-input <?php
                             echo esc_attr($data['class']); ?>-input"
-                                   type="text"<?= $style; ?> value="<?= isset($overrideValues[$option_key]) ? $overrideValues[$option_key] : ''; ?>"/>
+                                   type="text"<?= $style; ?> value="<?= $overrideValues[$option_key] ?? ''; ?>"/>
                         </span>
                     <?php
                     endforeach; ?>
@@ -599,10 +596,10 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                     echo esc_attr($field_key); ?>" id="<?php
                     echo esc_attr($field_key); ?>" style="<?php
                     echo esc_attr($data['css']); ?>" <?php
-                    disabled($data['disabled'], true); ?> <?php
+                    disabled($data['disabled']); ?> <?php
                     echo $this->get_custom_attribute_html($data); ?>>
                         <?php
-                        foreach ((array)$data['options'] as $option_key => $option_value) : ?>
+                        foreach ($data['options'] as $option_key => $option_value) : ?>
                             <option value="<?php
                             echo esc_attr($option_value); ?>" <?php
                             selected($option_value, esc_attr($this->get_option($key))); ?>><?php
@@ -675,10 +672,10 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                     echo esc_attr($field_key); ?>" id="<?php
                     echo esc_attr($field_key); ?>" style="<?php
                     echo esc_attr($data['css']); ?>" <?php
-                    disabled($data['disabled'], true); ?> <?php
+                    disabled($data['disabled']); ?> <?php
                     echo $this->get_custom_attribute_html($data); ?>>
                         <?php
-                        foreach ((array)$data['options'] as $option_key => $option_value) : ?>
+                        foreach ($data['options'] as $option_key => $option_value) : ?>
                             <option value="<?php
                             echo esc_attr($option_key); ?>" <?php
                             selected($option_key, esc_attr($this->get_option($key))); ?>><?php
@@ -747,7 +744,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                     echo esc_attr($data['css']); ?> width: 50px !important;" value="<?php
                     echo esc_attr(wc_format_localized_decimal($this->get_option($key))); ?>" placeholder="<?php
                     echo esc_attr($data['placeholder']); ?>" <?php
-                    disabled($data['disabled'], true); ?> <?php
+                    disabled($data['disabled']); ?> <?php
                     echo $this->get_custom_attribute_html($data); // WPCS: XSS ok.
                     ?> /><span style="vertical-align: -webkit-baseline-middle;padding: 6px;">%</span>
                     <?php
@@ -875,14 +872,12 @@ class TCG_Shipping_Method extends WC_Shipping_Method
         if (empty($excludes)) {
             $excludes = [];
         }
-        $filteredRates = array_filter(
+        return array_filter(
             $rates,
             function ($rate) use ($excludes) {
-                return (!in_array($rate['service'], $excludes));
+                return !in_array($rate['service'], $excludes);
             }
         );
-
-        return $filteredRates;
     }
 
     /**
@@ -965,7 +960,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                 }
             }
 
-            if ($taxRate != 0.00) {
+            if (is_numeric($taxRate) && $taxRate != 0.00) {
                 // Calculate tax if Tax rate is not 0
                 $totalPriceExcl = $totalPrice / $taxRate * 100;
                 $taxes          = $totalPrice - $totalPriceExcl;
@@ -1069,229 +1064,229 @@ class TCG_Shipping_Method extends WC_Shipping_Method
     {
         $fields                     = [
             'title'                                 => [
-                'title'   => __('Title', 'woocommerce'),
+                'title'   => __('Title', 'the-courier-guy'),
                 'type'    => 'text',
-                'label'   => __('Method Title', 'woocommerce'),
+                'label'   => __('Method Title', 'the-courier-guy'),
                 'default' => 'The Courier Guy'
             ],
             'account'                               => [
-                'title'       => __('Account number', 'woocommerce'),
+                'title'       => __('Account number', 'the-courier-guy'),
                 'type'        => 'text',
                 'description' => __(
                     'The account number supplied by The Courier Guy for integration purposes.',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
-                'default'     => __('', 'woocommerce')
+                'default'     => ''
             ],
             'ship_logic_access_key_id'              => [
-                'title'             => __('Access Key ID', 'woocommerce'),
+                'title'             => __('Access Key ID', 'the-courier-guy'),
                 'type'              => 'text',
                 'description'       => __(
                     'The access key ID for the Ship Logic API (legacy).',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'custom_attributes' => array(
                     'readonly' => 'readonly'
                 ),
-                'default'           => __('', 'woocommerce')
+                'default'           => ''
             ],
             'ship_logic_secret_access_key'          => [
-                'title'             => __('Access Key', 'woocommerce'),
+                'title'             => __('Access Key', 'the-courier-guy'),
                 'type'              => 'password',
                 'description'       => __(
                     'The secret access key for the Ship Logic API (legacy).',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'custom_attributes' => array(
                     'readonly' => 'readonly'
                 ),
-                'default'           => __('', 'woocommerce')
+                'default'           => ''
             ],
             'ship_logic_secret_access_token'        => [
-                'title'       => __('API Key', 'woocommerce'),
+                'title'       => __('API Key', 'the-courier-guy'),
                 'type'        => 'password',
                 'description' => __(
                     'The access token for the Ship Logic API (V2).',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
-                'default'     => __('', 'woocommerce')
+                'default'     => ''
             ],
             'tax_status'                            => [
-                'title'       => __('Tax status', 'woocommerce'),
+                'title'       => __('Tax status', 'the-courier-guy'),
                 'type'        => 'select',
                 'options'     => ['taxable' => 'Taxable', 'none' => 'None'],
-                'description' => __('VAT applies or not', 'woocommerce'),
-                'default'     => __('taxable', 'woocommerce')
+                'description' => __('VAT applies or not', 'the-courier-guy'),
+                'default'     => __('taxable', 'the-courier-guy')
             ],
             'company_name'                          => [
-                'title'       => __('Company Name', 'woocommerce'),
+                'title'       => __('Company Name', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('The name of your company.', 'woocommerce'),
+                'description' => __('The name of your company.', 'the-courier-guy'),
                 'default'     => '',
             ],
             'shopAddress1'                          => [
-                'title'       => __('Shop Street Number and Name', 'woocommerce'),
+                'title'       => __('Shop Street Number and Name', 'the-courier-guy'),
                 'type'        => 'text',
                 'description' => __(
                     'The address used to calculate shipping, this is considered the collection point for the parcels
                     being shipping. e.g 12 My Road',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'default'     => '',
             ],
             'shopSuburb'                            => [
-                'title'       => __('Shop Suburb', 'woocommerce'),
+                'title'       => __('Shop Suburb', 'the-courier-guy'),
                 'type'        => 'text',
                 'description' => __(
                     'Suburb forms part of the shipping address e.g Howick North',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'default'     => '',
             ],
             'shopCity'                              => [
-                'title'       => __('Shop City', 'woocommerce'),
+                'title'       => __('Shop City', 'the-courier-guy'),
                 'type'        => 'text',
                 'description' => __(
                     'City forms part of the shipping address e.g Howick',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'default'     => '',
             ],
             'shopState'                             => [
-                'title'       => __('Shop State or Province', 'woocommerce'),
+                'title'       => __('Shop State or Province', 'the-courier-guy'),
                 'type'        => 'select',
                 'description' => __(
                     'State / Province forms part of the shipping address e.g KZN',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'options'     => WC()->countries->get_states('ZA'),
                 'default'     => '',
             ],
             'shopCountry'                           => [
-                'title'       => __('Shop Country', 'woocommerce'),
+                'title'       => __('Shop Country', 'the-courier-guy'),
                 'type'        => 'select',
                 'description' => __(
                     'Country forms part of the shipping address e.g South Africa',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'options'     => WC()->countries->get_countries(),
-                'default'     => 'ZA',
+                'default'     => __('ZA', 'the-courier-guy'),
             ],
             'shopPostalCode'                        => [
-                'title'       => __('Shop Postal Code', 'woocommerce'),
+                'title'       => __('Shop Postal Code', 'the-courier-guy'),
                 'type'        => 'text',
                 'description' => __(
                     'The address used to calculate shipping, this is considered the collection point for the parcels being shipping.',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'default'     => '',
             ],
             'shopPhone'                             => [
-                'title'       => __('Shop Phone', 'woocommerce'),
+                'title'       => __('Shop Phone', 'the-courier-guy'),
                 'type'        => 'text',
                 'description' => __(
                     'The telephone number to contact the shop, this may be used by the courier.',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'default'     => '',
             ],
             'shopContactName'                       => [
-                'title'       => __('Shop Contact Name', 'woocommerce'),
+                'title'       => __('Shop Contact Name', 'the-courier-guy'),
                 'type'        => 'text',
                 'description' => __(
                     'The contact name of the shop, this may be used by the courier.',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'default'     => '',
             ],
             'shopEmail'                             => [
-                'title'       => __('Shop Email', 'woocommerce'),
+                'title'       => __('Shop Email', 'the-courier-guy'),
                 'type'        => 'email',
                 'description' => __(
                     'The email to contact the shop, this may be used by the courier.',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'default'     => '',
             ],
             'disable_specific_shipping_options'     => [
-                'title'             => __('Enable Specific shipping options', 'woocommerce'),
+                'title'             => __('Enable Specific shipping options', 'the-courier-guy'),
                 'type'              => 'multiselect',
                 'class'             => 'wc-enhanced-select',
                 'css'               => 'width: 450px;',
                 'description'       => __(
                     'Select the shipping options that you wish to always be included from the available shipping options on the checkout page.
                      <br>This setting is not available for WooCommerce Blocks.',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'default'           => '',
                 'options'           => $this->getAvailableShippingOptions(),
                 'custom_attributes' => [
-                    'data-placeholder' => __('Select the shipping option you would like to include', 'woocommerce')
+                    'data-placeholder' => __('Select the shipping option you would like to include', 'the-courier-guy')
                 ]
             ],
             'excludes'                              => [
-                'title'             => __('Exclude Rates', 'woocommerce'),
+                'title'             => __('Exclude Rates', 'the-courier-guy'),
                 'type'              => 'multiselect',
                 'class'             => 'wc-enhanced-select',
                 'css'               => 'width: 450px;',
                 'description'       => __(
                     'Select the rates that you wish to always be excluded from the available rates on the checkout page.',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'default'           => '',
                 'options'           => $this->getRateOptions(),
                 'custom_attributes' => [
-                    'data-placeholder' => __('Select the rates you would like to exclude', 'woocommerce')
+                    'data-placeholder' => __('Select the rates you would like to exclude', 'the-courier-guy')
                 ]
             ],
             'percentage_markup'                     => [
-                'title'       => __('Percentage Markup', 'woocommerce'),
+                'title'       => __('Percentage Markup', 'the-courier-guy'),
                 'type'        => 'tcg_percentage',
-                'description' => __('Percentage markup to be applied to each quote.', 'woocommerce'),
-                'default'     => ''
+                'description' => __('Percentage markup to be applied to each quote.', 'the-courier-guy'),
+                'default'     => '',
             ],
             'automatically_submit_collection_order' => [
-                'title'       => __('Automatically Submit Collection Order', 'woocommerce'),
+                'title'       => __('Automatically Submit Collection Order', 'the-courier-guy'),
                 'type'        => 'checkbox',
                 'description' => __(
                     'This will determine whether or not the collection order is automatically submitted to The Courier Guy after checkout completion.',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
-                'default'     => 'no'
+                'default'     => __('no', 'the-courier-guy'),
             ],
             'remove_waybill_description'            => [
-                'title'       => __('Generic waybill description', 'woocommerce'),
+                'title'       => __('Generic waybill description', 'the-courier-guy'),
                 'type'        => 'checkbox',
                 'description' => __(
                     'When enabled, a generic product description will be shown on the waybill.',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
-                'default'     => 'no'
+                'default'     => __('no', 'the-courier-guy'),
             ],
             'price_rate_override_per_service'       => [
-                'title'       => __('Price Rate Override Per Service', 'woocommerce'),
+                'title'       => __('Price Rate Override Per Service', 'the-courier-guy'),
                 'type'        => 'tcg_override_per_service',
                 'description' => __(
                                      'These prices will override The Courier Guy rates per service.',
-                                     'woocommerce'
+                                     'the-courier-guy'
                                  ) . '<br />' . __(
                                      'Select a service to add or remove price rate override.',
-                                     'woocommerce'
+                                     'the-courier-guy'
                                  ) . '<br />' . __(
                                      'Services with an overridden price will not use the \'Percentage Markup\' setting.',
-                                     'woocommerce'
+                                     'the-courier-guy'
                                  ),
                 'options'     => $this->getRateOptions(),
                 'default'     => '',
                 'class'       => 'tcg-override-per-service',
             ],
             'label_override_per_service'            => [
-                'title'       => __('Label Override Per Service', 'woocommerce'),
+                'title'       => __('Label Override Per Service', 'the-courier-guy'),
                 'type'        => 'tcg_override_per_service',
                 'description' => __(
                                      'These labels will override The Courier Guy labels per service.',
-                                     'woocommerce'
-                                 ) . '<br />' . __('Select a service to add or remove label override.', 'woocommerce'),
+                                     'the-courier-guy'
+                                 ) . '<br />' . __('Select a service to add or remove label override.', 'the-courier-guy'),
                 'options'     => $this->getRateOptions(),
                 'default'     => '',
                 'class'       => 'tcg-override-per-service',
@@ -1302,23 +1297,23 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                 'default' => '',
             ],
             'product_length_per_parcel_1'           => [
-                'title'       => __('Length of Flyer (cm)', 'woocommerce'),
+                'title'       => __('Length of Flyer (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Length of the Flyer - required', 'woocommerce'),
+                'description' => __('Length of the Flyer - required', 'the-courier-guy'),
                 'default'     => '42',
                 'placeholder' => 'none',
             ],
             'product_width_per_parcel_1'            => [
-                'title'       => __('Width of Flyer (cm)', 'woocommerce'),
+                'title'       => __('Width of Flyer (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Width of the Flyer - required', 'woocommerce'),
+                'description' => __('Width of the Flyer - required', 'the-courier-guy'),
                 'default'     => '32',
                 'placeholder' => 'none',
             ],
             'product_height_per_parcel_1'           => [
-                'title'       => __('Height of Flyer (cm)', 'woocommerce'),
+                'title'       => __('Height of Flyer (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Height of the Flyer - required', 'woocommerce'),
+                'description' => __('Height of the Flyer - required', 'the-courier-guy'),
                 'default'     => '12',
                 'placeholder' => 'none',
             ],
@@ -1328,23 +1323,23 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                 'default' => '',
             ],
             'product_length_per_parcel_2'           => [
-                'title'       => __('Length of Medium Parcel (cm)', 'woocommerce'),
+                'title'       => __('Length of Medium Parcel (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Length of the medium parcel - optional', 'woocommerce'),
+                'description' => __('Length of the medium parcel - optional', 'the-courier-guy'),
                 'default'     => '',
                 'placeholder' => 'none',
             ],
             'product_width_per_parcel_2'            => [
-                'title'       => __('Width of Medium Parcel (cm)', 'woocommerce'),
+                'title'       => __('Width of Medium Parcel (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Width of the medium parcel - optional', 'woocommerce'),
+                'description' => __('Width of the medium parcel - optional', 'the-courier-guy'),
                 'default'     => '',
                 'placeholder' => 'none',
             ],
             'product_height_per_parcel_2'           => [
-                'title'       => __('Height of Medium Parcel (cm)', 'woocommerce'),
+                'title'       => __('Height of Medium Parcel (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Height of the medium parcel - optional', 'woocommerce'),
+                'description' => __('Height of the medium parcel - optional', 'the-courier-guy'),
                 'default'     => '',
                 'placeholder' => 'none',
             ],
@@ -1354,23 +1349,23 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                 'default' => '',
             ],
             'product_length_per_parcel_3'           => [
-                'title'       => __('Length of Large Parcel (cm)', 'woocommerce'),
+                'title'       => __('Length of Large Parcel (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Length of the large parcel - optional', 'woocommerce'),
+                'description' => __('Length of the large parcel - optional', 'the-courier-guy'),
                 'default'     => '',
                 'placeholder' => 'none',
             ],
             'product_width_per_parcel_3'            => [
-                'title'       => __('Width of Large Parcel (cm)', 'woocommerce'),
+                'title'       => __('Width of Large Parcel (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Width of the large parcel - optional', 'woocommerce'),
+                'description' => __('Width of the large parcel - optional', 'the-courier-guy'),
                 'default'     => '',
                 'placeholder' => 'none',
             ],
             'product_height_per_parcel_3'           => [
-                'title'       => __('Height of Large Parcel (cm)', 'woocommerce'),
+                'title'       => __('Height of Large Parcel (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Height of the large parcel - optional', 'woocommerce'),
+                'description' => __('Height of the large parcel - optional', 'the-courier-guy'),
                 'default'     => '',
                 'placeholder' => 'none',
             ],
@@ -1380,23 +1375,23 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                 'default' => '',
             ],
             'product_length_per_parcel_4'           => [
-                'title'       => __('Length of Custom Parcel Size (cm)', 'woocommerce'),
+                'title'       => __('Length of Custom Parcel Size (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Length of the Custom Parcel Size - optional', 'woocommerce'),
+                'description' => __('Length of the Custom Parcel Size - optional', 'the-courier-guy'),
                 'default'     => '',
                 'placeholder' => 'none',
             ],
             'product_width_per_parcel_4'            => [
-                'title'       => __('Width of Custom Parcel Size (cm)', 'woocommerce'),
+                'title'       => __('Width of Custom Parcel Size (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Width of the Custom Parcel Size - optional', 'woocommerce'),
+                'description' => __('Width of the Custom Parcel Size - optional', 'the-courier-guy'),
                 'default'     => '',
                 'placeholder' => 'none',
             ],
             'product_height_per_parcel_4'           => [
-                'title'       => __('Height of Custom Parcel Size (cm)', 'woocommerce'),
+                'title'       => __('Height of Custom Parcel Size (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Height of the Custom Parcel Size - optional', 'woocommerce'),
+                'description' => __('Height of the Custom Parcel Size - optional', 'the-courier-guy'),
                 'default'     => '',
                 'placeholder' => 'none',
             ],
@@ -1406,23 +1401,23 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                 'default' => '',
             ],
             'product_length_per_parcel_5'           => [
-                'title'       => __('Length of Custom Parcel Size (cm)', 'woocommerce'),
+                'title'       => __('Length of Custom Parcel Size (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Length of the Custom Parcel Size - optional', 'woocommerce'),
+                'description' => __('Length of the Custom Parcel Size - optional', 'the-courier-guy'),
                 'default'     => '',
                 'placeholder' => 'none',
             ],
             'product_width_per_parcel_5'            => [
-                'title'       => __('Width of Custom Parcel Size (cm)', 'woocommerce'),
+                'title'       => __('Width of Custom Parcel Size (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Width of the Custom Parcel Size - optional', 'woocommerce'),
+                'description' => __('Width of the Custom Parcel Size - optional', 'the-courier-guy'),
                 'default'     => '',
                 'placeholder' => 'none',
             ],
             'product_height_per_parcel_5'           => [
-                'title'       => __('Height of Custom Parcel Size (cm)', 'woocommerce'),
+                'title'       => __('Height of Custom Parcel Size (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Height of the Custom Parcel Size - optional', 'woocommerce'),
+                'description' => __('Height of the Custom Parcel Size - optional', 'the-courier-guy'),
                 'default'     => '',
                 'placeholder' => 'none',
             ],
@@ -1432,63 +1427,63 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                 'default' => '',
             ],
             'product_length_per_parcel_6'           => [
-                'title'       => __('Length of Custom Parcel Size (cm)', 'woocommerce'),
+                'title'       => __('Length of Custom Parcel Size (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Length of the Custom Parcel Size - optional', 'woocommerce'),
+                'description' => __('Length of the Custom Parcel Size - optional', 'the-courier-guy'),
                 'default'     => '',
                 'placeholder' => 'none',
             ],
             'product_width_per_parcel_6'            => [
-                'title'       => __('Width of Custom Parcel Size (cm)', 'woocommerce'),
+                'title'       => __('Width of Custom Parcel Size (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Width of the Custom Parcel Size - optional', 'woocommerce'),
+                'description' => __('Width of the Custom Parcel Size - optional', 'the-courier-guy'),
                 'default'     => '',
                 'placeholder' => 'none',
             ],
             'product_height_per_parcel_6'           => [
-                'title'       => __('Height of Custom Parcel Size (cm)', 'woocommerce'),
+                'title'       => __('Height of Custom Parcel Size (cm)', 'the-courier-guy'),
                 'type'        => 'text',
-                'description' => __('Height of the Custom Parcel Size - optional', 'woocommerce'),
+                'description' => __('Height of the Custom Parcel Size - optional', 'the-courier-guy'),
                 'default'     => '',
                 'placeholder' => 'none',
             ],
             'billing_insurance'                     => [
-                'title'       => __('Enable shipping insurance ', 'woocommerce'),
+                'title'       => __('Enable shipping insurance ', 'the-courier-guy'),
                 'type'        => 'checkbox',
                 'description' => __(
                     'This will enable the shipping insurance field on the checkout page.<br>
                      A product subtotal of R1500 and above is required to activate TCG insurance.<br>
                      If you have WooCommerce Blocks, shipping insurance will be activated automatically<br>
                       if the subtotal is above the threshold and this setting is selected.',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'default'     => 'no'
             ],
             'free_shipping'                         => [
-                'title'       => __('Enable free shipping ', 'woocommerce'),
+                'title'       => __('Enable free shipping ', 'the-courier-guy'),
                 'type'        => 'checkbox',
-                'description' => __('This will enable free shipping over a specified amount', 'woocommerce'),
+                'description' => __('This will enable free shipping over a specified amount', 'the-courier-guy'),
                 'default'     => 'no'
             ],
             'rates_for_free_shipping'               => [
-                'title'             => __('Rates for free Shipping', 'woocommerce'),
+                'title'             => __('Rates for free Shipping', 'the-courier-guy'),
                 'type'              => 'multiselect',
                 'class'             => 'wc-enhanced-select',
                 'css'               => 'width: 450px;',
-                'description'       => __('Select the rates that you wish to enable for free shipping', 'woocommerce'),
+                'description'       => __('Select the rates that you wish to enable for free shipping', 'the-courier-guy'),
                 'default'           => '',
                 'options'           => $this->getRateOptions(),
                 'custom_attributes' => [
                     'data-placeholder' => __(
                         'Select the rates you would like to enable for free shipping',
-                        'woocommerce'
+                        'the-courier-guy'
                     )
                 ]
             ],
             'amount_for_free_shipping'              => [
-                'title'             => __('Amount for free Shipping', 'woocommerce'),
+                'title'             => __('Amount for free Shipping', 'the-courier-guy'),
                 'type'              => 'number',
-                'description'       => __('Enter the amount for free shipping when enabled', 'woocommerce'),
+                'description'       => __('Enter the amount for free shipping when enabled', 'the-courier-guy'),
                 'default'           => '1000',
                 'custom_attributes' => [
                     'min' => '0'
@@ -1496,49 +1491,49 @@ class TCG_Shipping_Method extends WC_Shipping_Method
 
             ],
             'product_free_shipping'                 => [
-                'title'       => __('Enable free shipping from product setting', 'woocommerce'),
+                'title'       => __('Enable free shipping from product setting', 'the-courier-guy'),
                 'type'        => 'checkbox',
                 'description' => __(
                     'This will enable free shipping if the product is included in the basket',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'default'     => 'no'
             ],
             'usemonolog'                            => [
-                'title'       => __('Enable WooCommerce Logging', 'woocommerce'),
+                'title'       => __('Enable WooCommerce Logging', 'the-courier-guy'),
                 'type'        => 'checkbox',
                 'description' => __(
                     'Check this to enable WooCommerce logging for this plugin. Remember to empty out logs when done.',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
-                'default'     => __('no', 'woocommerce'),
+                'default'     => __('no', 'the-courier-guy'),
             ],
             'enablemethodbox'                       => [
-                'title'       => __('Enable Method Box on Checkout', 'woocommerce'),
+                'title'       => __('Enable Method Box on Checkout', 'the-courier-guy'),
                 'type'        => 'checkbox',
                 'description' => __(
                     '
                         Check this to enable the Method Box on checkout page.<br>
                         Method Box is not available for WooCommerce Blocks.',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'default'     => 'no',
             ],
             'enablenonstandardpackingbox'           => [
-                'title'       => __('Use non-standard packing algorithm', 'woocommerce'),
+                'title'       => __('Use non-standard packing algorithm', 'the-courier-guy'),
                 'type'        => 'checkbox',
                 'description' => __(
                     'Check this to use the non-standard packing algorithm.<br> This is more accurate but will also use more server resources and may fail on shared servers.',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'default'     => 'no',
             ],
             'displaymessageifnorates'               => [
-                'title'       => __('Enable display message if no rates', 'woocommerce'),
+                'title'       => __('Enable display message if no rates', 'the-courier-guy'),
                 'type'        => 'checkbox',
                 'description' => __(
                     'Check this to display a message on checkout if there are no shipping options for a desired package and address.',
-                    'woocommerce'
+                    'the-courier-guy'
                 ),
                 'default'     => 'yes',
             ],
@@ -1547,7 +1542,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
     }
 
     /**
-     * @return array|mixed|object
+     * @return stdClass
      */
     private function getAvailableShippingOptions()
     {
@@ -1572,7 +1567,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
     }
 
     /**
-     * @return array|mixed|object
+     * @return stdClass
      */
     private function getRateOptions()
     {
