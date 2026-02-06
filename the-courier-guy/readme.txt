@@ -3,7 +3,7 @@ Tags: ecommerce, e-commerce, woocommerce, shipping, courier
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 5.1.5
+Stable tag: 5.4.0
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -379,6 +379,34 @@ We often suggest that the clients do not exclude the following shipping methods
 
 
 == Changelog ==
+= 5.4.0 - December 08, 2025
+* D2L (Door to Locker) TCG Locker Functionality: Integrated Basic TCG locker delivery options via Shiplogic API based on customer's delivery city.
+* Method Box Shipping Display Issue: Fixed shipping totals and options visibility toggle when switching between courier and collection modes.
+
+= 5.3.3 - November 10, 2025
+* Fixed critical conflict with LearnDash plugin that caused REST API fatal errors.
+  REST API routes are now properly registered using the 'rest_api_init' hook instead of during plugin initialization.
+  This resolves "Uncaught TypeError" errors in LearnDash REST controllers and prevents plugin loading conflicts.
+
+= 5.3.2 - October 17, 2025
+* Fixed critical cart error preventing checkout when delivery address is incomplete.
+  Added validation to ensure all required address fields (country, state, postcode, city, address) are present before calling ShipLogic API.
+  This resolves the "400 Bad Request response: the delivery address is missing" error that occurred when:
+  - New visitors added items to cart without being logged in.
+  - Users viewed cart before completing their shipping address.
+  - Customers attempted to proceed to checkout with incomplete address information.
+
+= 5.3.1 - October 17, 2025
+* Fixed critical error when using the WooCommerce admin order "Recalculate" button with The Courier Guy plugin enabled.
+  The plugin now skips the ShipLogic API call if required shipping rates are missing.
+
+= 5.3.0 - October 15, 2025
+* Introduce WooCommerce Blocks support.
+
+= 5.2.0 - October 08, 2025
+* WooCommerce order ID now included on the waybill for reference.
+* Resolved the plugin text domain issue that caused admin panel warnings.
+
 = 5.1.5 - August 05, 2025
 * Maintenance update to align with WordPress Code Standards.
 

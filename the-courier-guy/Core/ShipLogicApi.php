@@ -46,6 +46,10 @@ class ShipLogicApi
             'method'   => 'GET',
             'endPoint' => self::API_BASE . 'shipments/label?id=',
         ],
+        'getLockerLocations'         => [
+                'method'   => 'GET',
+                'endPoint' => self::API_BASE . 'pickup-points?order_closest=true&search=',
+            ],
     ];
 
     private $sender;
@@ -236,6 +240,17 @@ class ShipLogicApi
             try{
                 $response = $this->makeAPIRequest('getRates', ['body' => json_encode($body)]);
                 $rates    = json_decode($response, true);
+
+                $enabledTcgLockers = $parameters['enable_tcg_lockers'] ?? '0';
+
+                if ($enabledTcgLockers) {
+                    $lockerRates = $this->getLockerRates($body);
+
+                    if (!empty($lockerRates)) {
+                        $rates['rates'] = array_merge($rates['rates'], $lockerRates);
+                    }
+                }
+
                 if (!empty($rates['rates'])) {
                     set_transient($hash, $rates, 300);
                 }
@@ -249,6 +264,59 @@ class ShipLogicApi
         }
 
         return [];
+    }
+
+    public function getLockerRates($body): ?array
+    {
+        $lockerLocationsResponse = $this->makeAPIRequest('getLockerLocations', [
+            'param' => $body->delivery_address->city
+        ]);
+
+        if (empty($lockerLocationsResponse)) {
+            return null;
+        }
+
+        $lockerLocations = json_decode($lockerLocationsResponse, true);
+
+        if (empty($lockerLocations['pickup_points']) || count($lockerLocations['pickup_points']) <= 0) {
+            return null;
+        }
+
+        $pickupPoint = $lockerLocations['pickup_points'][0];
+
+        unset($body->delivery_address);
+        $body->delivery_pickup_point_id = $pickupPoint['pickup_point_id'];
+        $body->delivery_pickup_point_provider = $pickupPoint['pickup_point_provider'];
+
+        $hash  = 'tcg_locker_rates_' . hash('sha256', serialize($body));
+        $rates = get_transient($hash);
+
+        if ($rates) {
+            return $rates;
+        }
+
+        $response = $this->makeAPIRequest('getRates', ['body' => json_encode($body)]);
+
+        $rates = json_decode($response, true);
+
+        if (!empty($rates['rates'])) {
+            foreach ($rates['rates'] as &$rate) {
+                if (isset($rate['service_level']['description'])) {
+                    $originalDescription = $rate['service_level']['description'];
+
+                    $rate['service_level']['description'] = "{$pickupPoint['address']['company']}";
+                    $rate['service_level']['description'] .= " - {$pickupPoint['address']['entered_address']}.";
+                    $rate['service_level']['description'] .= " {$pickupPoint['trading_hours']}.";
+                    $rate['service_level']['description'] .= " {$originalDescription}";
+                    $rate['service_level']['code'] .= "/{$pickupPoint['pickup_point_id']}-{$pickupPoint['address']['company']}";
+                    $rate['service_level']['pickup_point'] = "{$pickupPoint['pickup_point_id']}";
+                }
+            }
+
+             set_transient($hash, $rates, 300);
+        }
+
+        return $rates['rates'] ?? [];
     }
 
     public function removeTrailingComma($string)
@@ -366,6 +434,10 @@ class ShipLogicApi
             'getShipmentLabel' => [
                 'method'   => 'GET',
                 'endPoint' => $apiBase . 'shipments/label?id=',
+            ],
+            'getLockerLocations'         => [
+                'method'   => 'GET',
+                'endPoint' => $apiBase . 'pickup-points?order_closest=true&search=',
             ],
         ];
 

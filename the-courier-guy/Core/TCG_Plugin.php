@@ -1,7 +1,5 @@
 <?php
 
-use Random\RandomException;
-
 $pluginpath = plugin_dir_path(__DIR__);
 
 /**
@@ -20,8 +18,8 @@ class TCG_Plugin extends CustomPlugin
      * @var WC_Logger
      */
     private static $log;
-    private        $shipLogicApi;
-    private        $parcelPerfectApiPayload;
+    private $shipLogicApi;
+    private $parcelPerfectApiPayload;
     /**
      * @var array
      */
@@ -72,10 +70,10 @@ class TCG_Plugin extends CustomPlugin
         add_filter('thecourierguy_flyer_fits_filter', [$this, 'flyer_fits_flyer_filter'], 10, 3);
 
         add_action(
-            'woocommerce_review_order_before_order_total',
-            [TCG_Shipping_Method::class, 'shipLogicRateOptins'],
-            10,
-            2
+                'woocommerce_review_order_before_order_total',
+                [TCG_Shipping_Method::class, 'shipLogicRateOptins'],
+                10,
+                2
         );
 
         add_action('wc_ajax_update_order_review', [$this, 'test_ajax']);
@@ -94,10 +92,15 @@ class TCG_Plugin extends CustomPlugin
         }
         $order        = wc_get_order($orderId);
         $getRatesBody = $order->get_meta(ShipLogicApi::TCG_SHIP_LOGIC_GETRATES_BODY, true);
+
+        if (empty($getRatesBody)) {
+            return;
+        }
+
         $this->initializeShipLogicApi();
         $response       = $this->shipLogicApi->makeAPIRequest(
-            'getRates',
-            ['body' => json_encode($getRatesBody)]
+                'getRates',
+                ['body' => json_encode($getRatesBody)]
         );
         $getRatesResult = json_decode($response, true);
         $order->update_meta_data(TCG_Shipping_Method::TCG_SHIP_LOGIC_RESULT, ['rates' => $getRatesResult]);
@@ -113,9 +116,9 @@ class TCG_Plugin extends CustomPlugin
         $pudo_word               = "pickup_dropoff";
 
         if (($_POST['iihtcg_selector_input'] ?? '') == 'tcg' && !str_contains(
-                $current_shipping_method,
-                $courier_guy_word
-            ) && !str_contains($current_shipping_method, $flatRateWord)
+                        $current_shipping_method,
+                        $courier_guy_word
+                ) && !str_contains($current_shipping_method, $flatRateWord)
             && !str_contains($current_shipping_method, $pudo_word)) {
             wc_add_notice(__('Please select a shipping method.', 'the-courier-guy'), 'error');
         }
@@ -124,9 +127,9 @@ class TCG_Plugin extends CustomPlugin
     public function test_ajax($fields)
     {
         $fields['ship_logic_opt_ins'] = [
-            'label'    => 'Opt Ins',
-            'required' => false,
-            'type'     => 'text',
+                'label'    => 'Opt Ins',
+                'required' => false,
+                'type'     => 'text',
         ];
 
         return $fields;
@@ -147,10 +150,10 @@ class TCG_Plugin extends CustomPlugin
 
         if (isset($settings['enablemethodbox']) && $settings['enablemethodbox'] === 'yes') {
             $fields['billing']['iihtcg_method'] = [
-                'label'    => 'iihtcg_method',
-                'type'     => 'text',
-                'required' => true,
-                'default'  => 'none',
+                    'label'    => 'iihtcg_method',
+                    'type'     => 'text',
+                    'required' => true,
+                    'default'  => 'none',
             ];
         }
 
@@ -181,10 +184,56 @@ HTML;
 <h5 id="please_select" style="color: #ff0000;">Please select an option to proceed</h5>
 <h5 id="please_complete" style="color: red" hidden>Please complete all required fields to proceed</h5>
 <span class="woocommerce-input-wrapper">
-<span id="couriertome"><input type="radio" name="iihtcg_selector_input" id="iihtcg_selector_input_tcg" value="tcg"><span style="display:inline;margin-left 5px !important;"><label for="iihtcg_selector_input_tcg"><strong>Courier my order to me</strong></label></span></span>
-<span id="collectorder"><input type="radio" name="iihtcg_selector_input" id="iihtcg_selector_input_collect" value="collect"><span style="display:inline;"><label for="iihtcg_selector_input_collect"><strong>I will collect my order</strong></label></span></span>
+<span id="couriertome"><input type="radio" name="iihtcg_selector_input" id="iihtcg_selector_input_tcg" value="tcg" onclick="showShippingMethods()"><span style="display:inline;margin-left 5px !important;"><label for="iihtcg_selector_input_tcg"><strong>Courier my order to me</strong></label></span></span>
+<span id="collectorder"><input type="radio" name="iihtcg_selector_input" id="iihtcg_selector_input_collect" value="collect" onclick="hideShippingMethods()"><span style="display:inline;"><label for="iihtcg_selector_input_collect"><strong>I will collect my order</strong></label></span></span>
 </span>
 </div>
+<script>
+function hideShippingMethodsUntilGone() {
+  const shippingTotals = document.getElementsByClassName('woocommerce-shipping-totals')[0];
+  const pleaseComplete = document.getElementById('please_complete');
+  const shippingOptions = document.getElementById('tcg_shipping_options');
+  
+  if (shippingTotals && shippingTotals.style.display !== 'none') {
+    shippingTotals.style.display = 'none';
+  }
+  
+  if (pleaseComplete && pleaseComplete.style.display !== 'none') {
+    pleaseComplete.style.display = 'none';
+  }
+  
+  if (shippingOptions && shippingOptions.style.display !== 'none') {
+    shippingOptions.style.display = 'none';
+  }
+  
+  if ((shippingTotals && shippingTotals.style.display !== 'none') ||
+      (pleaseComplete && pleaseComplete.style.display !== 'none') ||
+      (shippingOptions && shippingOptions.style.display !== 'none')) {
+    setTimeout(hideShippingMethodsUntilGone, 100);
+  }
+}
+
+function hideShippingMethods() {
+  document.getElementsByClassName('woocommerce-shipping-methods')[0].style.display = 'none';
+  
+  /**
+  * This setTimeout was added because there is a slight delay where WordPress fills in the empty space with the below
+  * message almost immediately after hiding the shipping methods.
+  * 
+  * WordPress default message:
+  * There are no shipping options available. Please ensure that your address has been entered correctly, or contact us
+  * if you need any help.
+  * */
+  setTimeout(hideShippingMethodsUntilGone, 1200);
+}
+
+function showShippingMethods() {
+  document.getElementsByClassName('woocommerce-shipping-totals')[0].style.display = '';
+  document.getElementsByClassName('woocommerce-shipping-methods')[0].style.display = '';
+  document.getElementById('please_complete').style.display = '';
+  document.getElementById('tcg_shipping_options').style.display = '';
+}
+</script>
 HTML;
             }
         }
@@ -216,8 +265,10 @@ HTML;
                 $order = wc_get_order($wc_session->get("store_api_draft_order")) ?? false;
                 if ($order) {
                     $this->updateShippingPropertiesOnOrder($order->get_id(), []);
-                    $this->add_shipping_selector();
-                    TCG_Shipping_Method::shipLogicRateOptins();
+                    // Only call shipping options for traditional checkout, not blocks
+                    if (!TCG_Shipping_Method::is_woocommerce_blocks_checkout()) {
+                        TCG_Shipping_Method::shipLogicRateOptins();
+                    }
                     $this->updateShippingPropertiesFromCheckout();
                 }
             }
@@ -247,14 +298,14 @@ HTML;
             }
         }
         usort(
-            $maxRates,
-            function ($a, $b){
-                if ($a['val'] === $b['val']) {
-                    return 0;
-                }
+                $maxRates,
+                function ($a, $b) {
+                    if ($a['val'] === $b['val']) {
+                        return 0;
+                    }
 
-                return $a['val'] > $b['val'] ? -1 : 1;
-            }
+                    return $a['val'] > $b['val'] ? -1 : 1;
+                }
         );
         $cnt = 0;
         foreach ($maxRates as $maxRate) {
@@ -310,7 +361,7 @@ HTML;
     public function updateShippingPropertiesOnOrder($orderId, $data)
     {
         if ($wc_session = WC()->session) {
-            $order = !empty($data) ? new WC_Order($orderId) : wc_get_order($orderId);
+            $order = ! empty($data) ? new WC_Order($orderId) : wc_get_order($orderId);
 
             $getRatesBody = $wc_session->get(ShipLogicApi::TCG_SHIP_LOGIC_GETRATES_BODY);
             if ($getRatesBody) {
@@ -340,7 +391,6 @@ HTML;
                 break;
             }
 
-            $order->add_order_note('Order shipping total on order: ' . $order->get_shipping_total());
             $order->save();
             $order->save_meta_data();
             $this->clearShippingCustomProperties();
@@ -369,7 +419,7 @@ HTML;
             }
 
             $addressPrefix = 'shipping_';
-            if (!isset($parameters['ship_to_different_address']) || !$parameters['ship_to_different_address']) {
+            if (!isset($parameters['ship_to_different_address']) || $parameters['ship_to_different_address'] != true) {
                 $addressPrefix = 'billing_';
             }
             $insurance = false;
@@ -380,7 +430,7 @@ HTML;
             }
 
             $customProperties = [
-                'tcg_insurance' => $insurance,
+                    'tcg_insurance' => $insurance,
             ];
 
             if (is_array($shippingMethods)) {
@@ -388,7 +438,7 @@ HTML;
                     if ($vendorId === 0) {
                         $customProperties['tcg_shipping_method'] = $shippingMethod;
                         $qn                                      = json_encode(
-                            $wc_session->get('tcg_quote_response')
+                                $wc_session->get('tcg_quote_response')
                         );
                         if ($qn == 'null' || strlen($qn) < 3) {
                             $qn = $wc_session->get('tcg_response');
@@ -412,7 +462,7 @@ HTML;
                         $customProperties['tcg_shipping_method_' . $vendorId] = $shippingMethod;
                         $vendorId                                             = $vendorId === 0 ? '' : $vendorId;
                         $qn                                                   = json_encode(
-                            $wc_session->get('tcg_quote_response' . $vendorId)
+                                $wc_session->get('tcg_quote_response' . $vendorId)
                         );
                         if ($qn == 'null' || strlen($qn) < 3) {
                             $qn = $wc_session->get('tcg_response' . $vendorId);
@@ -443,8 +493,17 @@ HTML;
 
     function is_woocommerce_blocks_checkout()
     {
+        // Check if we're in a WooCommerce Store API request
+        if (defined('REST_REQUEST') && REST_REQUEST) {
+            $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+            if (str_contains($request_uri, '/wc/store/')) {
+                return true;
+            }
+        }
+
+        // Check content for blocks
         $content = get_the_content();
-        if (str_contains($content, 'wp-block-woocommerce-checkout')) {
+        if ($content && str_contains($content, 'wp-block-woocommerce-checkout')) {
             return true;
         }
 
@@ -474,6 +533,7 @@ HTML;
      * @param $sent_to_admin
      * @param $plain_text
      *
+     * @return mixed
      */
     public function addExtraEmailFields($order, $sent_to_admin, $plain_text)
     {
@@ -489,6 +549,8 @@ HTML;
   Click me to track</a></span><br><br>
 HTML;
             }
+        } else {
+            return;
         }
     }
 
@@ -507,8 +569,8 @@ HTML;
     {
         $shippingMethodParameters = $this->getShippingMethodParameters($order);
         if ($this->hasTcgShippingMethod(
-                $order
-            ) && $shippingMethodParameters['automatically_submit_collection_order'] === 'yes') {
+                        $order
+                ) && $shippingMethodParameters['automatically_submit_collection_order'] === 'yes') {
             $this->createShipment($order);
         }
     }
@@ -521,30 +583,30 @@ HTML;
     public function addShippingMetaToOrder($adminShippingFields = [])
     {
         $tcgAdminShippingFields = [
-            'insurance' => [
-                'label'    => __('Courier Guy Insurance', 'the-courier-guy'),
-                'class'    => 'wide',
-                'show'     => true,
-                'readonly' => true,
-                'type',
-                'checkbox'
-            ],
-            'area'      => [
-                'label'             => __('Courier Guy Shipping Area Code', 'the-courier-guy'),
-                'wrapper_class'     => 'form-field-wide',
-                'show'              => true,
-                'custom_attributes' => [
-                    'disabled' => 'disabled',
+                'insurance' => [
+                        'label'    => __('Courier Guy Insurance', 'the-courier-guy'),
+                        'class'    => 'wide',
+                        'show'     => true,
+                        'readonly' => true,
+                        'type',
+                        'checkbox'
                 ],
-            ],
-            'place'     => [
-                'label'             => __('Courier Guy Shipping Area Description', 'the-courier-guy'),
-                'wrapper_class'     => 'form-field-wide',
-                'show'              => true,
-                'custom_attributes' => [
-                    'disabled' => 'disabled',
+                'area'      => [
+                        'label'             => __('Courier Guy Shipping Area Code', 'the-courier-guy'),
+                        'wrapper_class'     => 'form-field-wide',
+                        'show'              => true,
+                        'custom_attributes' => [
+                                'disabled' => 'disabled',
+                        ],
                 ],
-            ],
+                'place'     => [
+                        'label'             => __('Courier Guy Shipping Area Description', 'the-courier-guy'),
+                        'wrapper_class'     => 'form-field-wide',
+                        'show'              => true,
+                        'custom_attributes' => [
+                                'disabled' => 'disabled',
+                        ],
+                ],
         ];
 
         return array_merge($adminShippingFields, $tcgAdminShippingFields);
@@ -559,12 +621,12 @@ HTML;
         $id      = $order->get_meta('ship_logic_order_id', true);
 
         $shipLogicApi = $this->shipLogicApi;
-        try{
+        try {
             $url    = $shipLogicApi->getShipmentLabel($id);
             $pdfUrl = json_decode($url)->url;
             wp_redirect($pdfUrl);
             exit;
-        } catch (Exception $exception){
+        } catch (Exception $exception) {
         }
 
         exit;
@@ -579,12 +641,13 @@ HTML;
      */
     function addTCGReturnButton($order): void
     {
-        $shipping_method = reset($order->get_shipping_methods());
+        $shippingMethods = $order->get_shipping_methods();
+        $shipping_method = reset($shippingMethods);
 
         $shipping_method_id = $shipping_method['method_id'];
 
-        if (!str_contains($shipping_method_id, "the_courier_guy")
-            || $order->get_meta("tcg_returned") === "1") {
+        if ( ! str_contains($shipping_method_id, "the_courier_guy")
+             || $order->get_meta("tcg_returned") === "1") {
             return;
         }
 
@@ -599,28 +662,28 @@ HTML;
             <span hidden class="loading-indicator">Loading...</span>
         </button>
         <script>
-          jQuery('#tcg-return-btn').on('click', function (){
-            jQuery(this).find('.loading-indicator').show()
-            jQuery(this).find('.button-text').hide()
-            jQuery.ajax({
-              url    : '/wp-admin/admin-ajax.php',
-              type   : 'POST',
-              data   : {
-                action  : 'tcg_return_action',
-                order_id: <?php echo $order->get_id(); ?>
-              },
-              success: function (response){
-                jQuery(this).find('.loading-indicator').hide()
-                jQuery(this).find('.button-text').show()
-                if(true === response.success){
-                  console.log(response)
-                  window.location.reload()
-                } else {
-                  window.alert(response)
-                }
-              }
+            jQuery('#tcg-return-btn').on('click', function () {
+                jQuery(this).find('.loading-indicator').show()
+                jQuery(this).find('.button-text').hide()
+                jQuery.ajax({
+                    url: '/wp-admin/admin-ajax.php',
+                    type: 'POST',
+                    data: {
+                        action: 'tcg_return_action',
+                        order_id: <?php echo $order->get_id(); ?>
+                    },
+                    success: function (response) {
+                        jQuery(this).find('.loading-indicator').hide()
+                        jQuery(this).find('.button-text').show()
+                        if (true === response.success) {
+                            console.log(response)
+                            window.location.reload()
+                        } else {
+                            window.alert(response)
+                        }
+                    }
+                })
             })
-          })
         </script>
         <?php
     }
@@ -633,9 +696,9 @@ HTML;
      */
     public
     function addPrintWayBillActionToOrderMetaBox(
-        array $actions,
-        $order
-    ){
+            array $actions,
+            $order
+    ) {
         $hasShippingMethod = $this->hasTcgShippingMethod($order);
         $waybill           = $order->get_meta(self::SHIP_LOGIC_SHORT_TRACKING_REFERENCE, true);
         if ($hasShippingMethod && $waybill !== '') {
@@ -651,9 +714,9 @@ HTML;
     {
         ?>
         <script>
-          jQuery(function (){
-            jQuery('.return-items').prop('disabled', false)
-          })
+            jQuery(function () {
+                jQuery('.return-items').prop('disabled', false)
+            })
         </script>
         <?php
     }
@@ -666,13 +729,13 @@ HTML;
      */
     public
     function addSendCollectionActionToOrderMetaBox(
-        array $actions,
-        $order
-    ){
+            array $actions,
+            $order
+    ) {
         $hasShippingMethod = $this->hasTcgShippingMethod($order);
         $waybill           = $order->get_meta(self::SHIP_LOGIC_SHORT_TRACKING_REFERENCE, true);
         if ($hasShippingMethod && $waybill === '') {
-            $actions['tcg_send_collection'] = __('Send Order to Courier Guy','the-courier-guy');
+            $actions['tcg_send_collection'] = __('Send Order to Courier Guy', 'the-courier-guy');
         }
 
         return $actions;
@@ -688,52 +751,52 @@ HTML;
      */
     public
     function getSuburbFormFieldMarkUp(
-        $field,
-        $key,
-        $args,
-        $value
-    ){
+            $field,
+            $key,
+            $args,
+            $value
+    ) {
         //@todo The contents of this method is legacy code from an older version of the plugin.
         if ($args['required']) {
             $args['class'][] = 'validate-required';
             $required        = ' <abbr class="required" title="' . esc_attr__(
-                    'required',
-                    'the-courier-guy'
-                ) . '">*</abbr>';
+                            'required',
+                            'the-courier-guy'
+                    ) . '">*</abbr>';
         } else {
             $required = '';
         }
         $options                  = $field = '';
         $label_id                 = $args['id'];
-        $sort                     = $args['priority'] ?? '';
+        $sort                     = $args['priority'] ? $args['priority'] : '';
         $field_container          = '<p class="form-row %1$s" id="%2$s" data-sort="' . esc_attr($sort) . '">%3$s</p>';
         $customShippingProperties = $this->getShippingCustomProperties();
-        $option_key               = $customShippingProperties['tcg_place_id'] ?? '';
-        $option_text              = $customShippingProperties['tcg_place_label'] ?? '';
+        $option_key               = isset($customShippingProperties['tcg_place_id']) ? $customShippingProperties['tcg_place_id'] : '';
+        $option_text              = isset($customShippingProperties['tcg_place_label']) ? $customShippingProperties['tcg_place_label'] : '';
         $options                  .= '<option value="' . esc_attr($option_key) . '" ' . selected(
-                $value,
-                $option_key,
-                false
-            ) . '>' . esc_attr($option_text) . '</option>';
+                        $value,
+                        $option_key,
+                        false
+                ) . '>' . esc_attr($option_text) . '</option>';
         $field                    .= '<input type="hidden" name="' . esc_attr(
-                $key
-            ) . '_place_id" value="' . $option_key . '"/>';
+                        $key
+                ) . '_place_id" value="' . $option_key . '"/>';
         $field                    .= '<input type="hidden" name="' . esc_attr(
-                $key
-            ) . '_place_label" value="' . $option_text . '"/>';
+                        $key
+                ) . '_place_label" value="' . $option_text . '"/>';
         $field                    .= '<select id="' . esc_attr($args['id']) . '" name="' . esc_attr(
-                $args['id']
-            ) . '" class="select ' . esc_attr(
-                implode(' ', $args['input_class'])
-            ) . '" ' . ' data-placeholder="' . esc_attr($args['placeholder']) . '">
+                        $args['id']
+                ) . '" class="select ' . esc_attr(
+                                             implode(' ', $args['input_class'])
+                                     ) . '" ' . ' data-placeholder="' . esc_attr($args['placeholder']) . '">
                             ' . $options . '
                         </select>';
         if (!empty($field)) {
             $field_html = '';
             if ($args['label'] && 'checkbox' != $args['type']) {
                 $field_html .= '<label for="' . esc_attr($label_id) . '" class="' . esc_attr(
-                        implode(' ', $args['label_class'])
-                    ) . '">' . $args['label'] . $required . '</label>';
+                                implode(' ', $args['label_class'])
+                        ) . '">' . $args['label'] . $required . '</label>';
             }
             $field_html .= $field;
             if ($args['description']) {
@@ -754,8 +817,8 @@ HTML;
      */
     public
     function overrideAddressFields(
-        $fields
-    ){
+            $fields
+    ) {
         return $fields;
     }
 
@@ -788,13 +851,13 @@ HTML;
         $term        = sanitize_text_field($_GET['q']['term']);
         $dp_areas    = [];
         $payloadData = [
-            'name' => $term,
+                'name' => $term,
         ];
         $d           = $this->getPlacesByName($payloadData);
         foreach ($d as $result) {
             $suggestion = [
-                'suburb_value' => $result['town'],
-                'suburb_key'   => $result['place'],
+                    'suburb_value' => $result['town'],
+                    'suburb_key'   => $result['place'],
             ];
             $dp_areas[] = $suggestion;
         }
@@ -815,8 +878,8 @@ HTML;
             $southAfricaOnly = true;
         }
         $translation_array = [
-            'url'             => get_admin_url(null, 'admin-ajax.php'),
-            'southAfricaOnly' => ($southAfricaOnly) ? 'true' : 'false',
+                'url'             => get_admin_url(null, 'admin-ajax.php'),
+                'southAfricaOnly' => ($southAfricaOnly) ? 'true' : 'false',
         ];
         wp_localize_script($this->getPluginTextDomain() . '-main510.js', 'theCourierGuy', $translation_array);
     }
@@ -881,9 +944,9 @@ HTML;
      */
     public
     function flyer_fits_flyer_filter(
-        $result,
-        $payload
-    ){
+            $result,
+            $payload
+    ) {
         $nonFlyer = ['LSF', 'LOF', 'NFS',];
         if (!$payload['contents']['fitsFlyer']) {
             foreach ($result as $j => $item) {
@@ -927,6 +990,10 @@ HTML;
             $name .= 'Fuel charge';
         }
 
+        if (str_contains($name, 'D2L')) {
+            $name = str_replace(': Fuel charge', '', $name);
+        }
+
         return $name;
     }
 
@@ -944,10 +1011,10 @@ HTML;
         $html = '<ul class="woocommerce-' . $status . '" role="' . $role . '"><li data-id="billing_tcg_place_lookup"><strong>' . $message . '</strong></li></ul>';
 
         $response = array(
-            'result'   => $status,
-            'messages' => $html,
-            'refresh'  => true,
-            'reload'   => false
+                'result'   => $status,
+                'messages' => $html,
+                'refresh'  => true,
+                'reload'   => false
         );
 
         if ($status == "error") {
@@ -1027,8 +1094,8 @@ HTML;
      */
     private
     function setShippingCustomProperties(
-        $customProperties
-    ){
+            $customProperties
+    ) {
         if ($wc_session = WC()->session) {
             $properties = [];
             foreach ($customProperties as $key => $customProperty) {
@@ -1045,9 +1112,9 @@ HTML;
      */
     private
     function sendPdf(
-        $filePaths,
-        $zipfile = null
-    ){
+            $filePaths,
+            $zipfile = null
+    ) {
         if (!$zipfile) {
             header('Content-type: application/pdf');
             header('Content-Disposition: inline; filename="' . basename($filePaths[0]) . '"');
@@ -1076,21 +1143,27 @@ HTML;
         exit;
     }
 
-    private
-    function getShippingMethodSettings()
+    public static function getShippingMethodSettings($instance_id = null)
     {
         $shippingMethodSettings = [];
-        $existingZones          = WC_Shipping_Zones::get_zones();
-        foreach ($existingZones as $zone) {
-            $shippingMethods = $zone['shipping_methods'];
-            foreach ($shippingMethods as $shippingMethod) {
-                if ($shippingMethod->id == 'the_courier_guy') {
-                    $courierGuyShippingMethod = $shippingMethod;
+        if ($instance_id !== null) {
+            $settings = get_option('woocommerce_the_courier_guy_' . $instance_id . '_settings');
+            if (!empty($settings)) {
+                $shippingMethodSettings = $settings;
+            }
+        } else {
+            $existingZones = WC_Shipping_Zones::get_zones();
+            foreach ($existingZones as $zone) {
+                $shippingMethods = $zone['shipping_methods'];
+                foreach ($shippingMethods as $shippingMethod) {
+                    if ($shippingMethod->id == 'the_courier_guy') {
+                        $courierGuyShippingMethod = $shippingMethod;
+                    }
                 }
             }
-        }
-        if (!empty($courierGuyShippingMethod)) {
-            $shippingMethodSettings = $courierGuyShippingMethod->instance_settings;
+            if (!empty($courierGuyShippingMethod)) {
+                $shippingMethodSettings = $courierGuyShippingMethod->instance_settings;
+            }
         }
 
         return $shippingMethodSettings;
@@ -1104,45 +1177,45 @@ HTML;
      */
     private
     function addAddressFields(
-        $addressType,
-        $fields
-    ){
+            $addressType,
+            $fields
+    ) {
         $addressFields          = $fields[$addressType];
         $shippingMethodSettings = $this->getShippingMethodSettings();
-        if (!empty($shippingMethodSettings) && !empty($shippingMethodSettings['south_africa_only']) && $shippingMethodSettings['south_africa_only'] == 'yes') {
+        if (!empty($shippingMethodSettings) && ! empty($shippingMethodSettings['south_africa_only']) && $shippingMethodSettings['south_africa_only'] == 'yes') {
             $required = false;
         }
 
         $addressFields = array_merge(
-            $addressFields,
-            [
-                $addressType . '_postcode' => [
-                    'type'     => 'text',
-                    'label'    => 'Postcode',
-                    'required' => true,
-                    'class'    => ['form-row-last'],
-                ],
-            ]
+                $addressFields,
+                [
+                        $addressType . '_postcode' => [
+                                'type'     => 'text',
+                                'label'    => 'Postcode',
+                                'required' => true,
+                                'class'    => ['form-row-last'],
+                        ],
+                ]
         );
         if (isset($shippingMethodSettings['billing_insurance']) && $shippingMethodSettings['billing_insurance'] === 'yes') {
             $addressFields[$addressType . '_insurance'] = [
-                'type'     => 'checkbox',
-                'label'    => 'Would you like to include Shipping Insurance',
-                'required' => false,
-                'class'    => ['form-row-wide', 'tcg-insurance'],
-                'priority' => 90,
+                    'type'     => 'checkbox',
+                    'label'    => 'Would you like to include Shipping Insurance',
+                    'required' => false,
+                    'class'    => ['form-row-wide', 'tcg-insurance'],
+                    'priority' => 90,
             ];
         }
         $addressFields[$addressType . '_tcg_quoteno'] = [
-            'type'     => 'text',
-            'label'    => 'TCG Quote Number',
-            'required' => false,
-            'class'    => ['form-row-wide', 'tcg-quoteno'],
-            'priority' => 90,
+                'type'     => 'text',
+                'label'    => 'TCG Quote Number',
+                'required' => false,
+                'class'    => ['form-row-wide', 'tcg-quoteno'],
+                'priority' => 90,
         ];
         $legacyFieldProperties                        = [
-            'type'     => 'hidden',
-            'required' => false,
+                'type'     => 'hidden',
+                'required' => false,
         ];
         //@todo The setting of these additional billing and shipping properties is legacy from an older version of the plugin. This is to override legacy properties to invalidate cached required validation.
         $addressFields[$addressType . '_area']  = $legacyFieldProperties;
@@ -1162,10 +1235,10 @@ HTML;
 
         require_once $this->getPluginPath() . 'Core/ShipLogicApi.php';
         $this->shipLogicApi = new ShipLogicApi(
-            $this->getAccessKeyId(),
-            $this->getAccessKey(),
-            $this->getAccessToken(),
-            $logging
+                $this->getAccessKeyId(),
+                $this->getAccessKey(),
+                $this->getAccessToken(),
+                $logging
         );
     }
 
@@ -1184,8 +1257,8 @@ HTML;
      */
     private
     function setShipLogicApiPayload(
-        $shipLogicApiPayload
-    ){
+            $shipLogicApiPayload
+    ) {
         $this->parcelPerfectApiPayload = $shipLogicApiPayload;
     }
 
@@ -1208,12 +1281,12 @@ HTML;
     {
         require_once $this->getPluginPath() . 'Shipping/TCG_ShippingMethod.php';
         add_filter(
-            'woocommerce_shipping_methods',
-            function ($methods){
-                $methods['the_courier_guy'] = 'TCG_Shipping_Method';
+                'woocommerce_shipping_methods',
+                function ($methods) {
+                    $methods['the_courier_guy'] = 'TCG_Shipping_Method';
 
-                return $methods;
-            }
+                    return $methods;
+                }
         );
     }
 
@@ -1225,9 +1298,9 @@ HTML;
      */
     private
     function createShipment(
-        WC_Order $order,
-        bool $returnShipment = false
-    ){
+            WC_Order $order,
+            bool $returnShipment = false
+    ) {
         if ($this->hasTcgShippingMethod($order)) {
             $shippingMethodParameters = $this->getShippingMethodParameters($order);
 
@@ -1236,6 +1309,8 @@ HTML;
             $getRatesResult   = $order->get_meta(TCG_Shipping_Method::TCG_SHIP_LOGIC_RESULT, true);
             $grr              = json_encode($getRatesResult);
             $service_level_id = $getRatesResult['rates']['rates'][0]['service_level']['id'];
+            $rateCode         = $getRatesResult['rates']['rates'][0]['service_level']['code'];
+            $pickupPointId    = $getRatesResult['rates']['rates'][0]['service_level']['pickup_point'] ?? '';
 
             $shipping_title = "";
             foreach ($order->get_items('shipping') as $item_id => $item) {
@@ -1252,6 +1327,10 @@ HTML;
                 if ($rateName == $shipping_title || $shippingMethodCode == $rateCode) {
                     $service_level_id = $base_rate['service_level']['id'];
                 }
+
+                if (!empty($base_rate['service_level']['pickup_point'])) {
+                    $pickupPointId = $base_rate['service_level']['pickup_point'];
+                }
             }
 
             $createShipmentBody = new stdClass();
@@ -1263,10 +1342,21 @@ HTML;
             $collection_contact->email              = $shippingMethodParameters['shopEmail'];
             $createShipmentBody->collection_contact = $collection_contact;
 
-            $createShipmentBody->delivery_address = $getRatesBody->delivery_address;
+            $shipmentType = $shippingMethodID[2];
+            if (str_contains($shipmentType, 'D2L') && !empty($pickupPointId)) {
+                $createShipmentBody->delivery_pickup_point_provider = 'tcg-locker';
+                $createShipmentBody->delivery_pickup_point_id       = $pickupPointId;
+
+                $serviceCode                            = trim(preg_replace('/[\/\\\\].*/', '', $shipmentType));
+                $createShipmentBody->service_level_code = $serviceCode;
+            } else {
+                $createShipmentBody->delivery_address = $getRatesBody->delivery_address;
+                $createShipmentBody->service_level_id = $service_level_id;
+            }
+
             $delivery_contact                     = new stdClass();
             $delivery_contact->name               = $order->get_shipping_first_name(
-                ) . ' ' . $order->get_shipping_last_name();
+                    ) . ' ' . $order->get_shipping_last_name();
             $delivery_contact->mobile_number      = $order->get_billing_phone();
             $delivery_contact->email              = $order->get_billing_email();
             $createShipmentBody->delivery_contact = $delivery_contact;
@@ -1278,7 +1368,7 @@ HTML;
             $parcels = $getRatesBody->parcels;
 
             $waybillDescriptionOverride = isset($shippingMethodParameters['remove_waybill_description'])
-                && $shippingMethodParameters['remove_waybill_description'] === 'yes';
+                                          && $shippingMethodParameters['remove_waybill_description'] === 'yes';
 
             $parcels = $this->applyPackageDescriptions($parcels, $waybillDescriptionOverride);
 
@@ -1295,45 +1385,45 @@ HTML;
             $createShipmentBody->special_instructions_collection = '';
             $createShipmentBody->special_instructions_delivery   = $order->data['customer_note'];
             $createShipmentBody->declared_value                  = $getRatesBody->declared_value;
-            $createShipmentBody->service_level_id                = $service_level_id;
+            $createShipmentBody->customer_reference              = $order->get_order_number();
 
             $shipLogicApi = $this->shipLogicApi;
-            try{
+            try {
                 $result   = $shipLogicApi->createShipment($createShipmentBody);
                 $response = json_decode($result);
 
                 $shipLogicOrderIdNote       = 'Ship Logic Order Id: ' . $response->id;
                 $shipLogicTrackingOrderNote = 'Ship Logic Short Tracking Reference: '
-                    . $response->short_tracking_reference;
+                                              . $response->short_tracking_reference;
 
                 if ($returnShipment) {
                     $order->update_meta_data('tcg_returned', "1");
 
                     $order->add_order_note(
-                        "TCG Return\n ---Collection---: "
-                        . json_encode($createShipmentBody->collection_address)
-                        . "\n ---Destination---: " . json_encode($createShipmentBody->delivery_address)
+                            "TCG Return\n ---Collection---: "
+                            . json_encode($createShipmentBody->collection_address)
+                            . "\n ---Destination---: " . json_encode($createShipmentBody->delivery_address)
                     );
 
                     $shipLogicOrderIdNote       = "Return $shipLogicOrderIdNote";
                     $shipLogicTrackingOrderNote = "Return $shipLogicTrackingOrderNote";
 
                     $ajaxResponse = array(
-                        'success' => true,
-                        'message' => 'Return order created successfully'
+                            'success' => true,
+                            'message' => 'Return order created successfully'
                     );
                 }
 
                 $order->update_meta_data('ship_logic_order_id', $response->id);
                 $order->add_order_note($shipLogicOrderIdNote);
                 $order->update_meta_data(
-                    self::SHIP_LOGIC_SHORT_TRACKING_REFERENCE,
-                    $response->short_tracking_reference
+                        self::SHIP_LOGIC_SHORT_TRACKING_REFERENCE,
+                        $response->short_tracking_reference
                 );
                 $order->add_order_note($shipLogicTrackingOrderNote);
 
                 $order->save();
-            } catch (Exception $exception){
+            } catch (Exception $exception) {
                 $order->add_order_note('Ship Logic Order Not Created: ' . $exception->getMessage());
                 $order->save();
             }
@@ -1390,14 +1480,11 @@ HTML;
         return $createShipmentBody;
     }
 
-    /**
-     * @throws RandomException
-     */
     private
     function savePdfWaybill(
-        $result,
-        $orderId
-    ){
+            $result,
+            $orderId
+    ) {
         $collectno          = $result['collectno'];
         $base64             = $result['waybillBase64'];
         $filename           = md5($collectno . random_bytes(16) . time());
@@ -1411,30 +1498,30 @@ HTML;
             $tcg_waybill_filenames = [];
         }
         $tcg_waybill_filenames[] = $filename;
-        try{
+        try {
             $order->update_meta_data('tcg_waybill_filename', json_encode($tcg_waybill_filenames));
             $f = fopen($pdfFilePath, 'wb');
             fwrite($f, base64_decode($base64));
             fclose($f);
-        } catch (Exception $e){
+        } catch (Exception $e) {
         }
     }
 
     private
     function hasTcgShippingMethod(
-        $order
-    ){
+            $order
+    ) {
         $result = false;
         if (!empty($order)) {
             $shipping_data = json_decode($order->get_meta('_order_shipping_data', true), true);
             if (is_array($shipping_data)) {
                 array_walk(
-                    $shipping_data,
-                    function ($shippingItem) use (&$result){
-                        if (is_string($shippingItem) && strstr($shippingItem, 'the_courier_guy')) {
-                            $result = true;
+                        $shipping_data,
+                        function ($shippingItem) use (&$result) {
+                            if (is_string($shippingItem) && strstr($shippingItem, 'the_courier_guy')) {
+                                $result = true;
+                            }
                         }
-                    }
                 );
             }
         }
@@ -1489,23 +1576,23 @@ HTML;
      */
     private
     function clearCachedQuote(
-        $vendorId
-    ){
+            $vendorId
+    ) {
         $vendorId = $vendorId === 0 ? '' : $vendorId;
 
         if ($wc_session = WC()->session) {
             $wc_session->set(
-                'tcg_response' . $vendorId,
-                ''
+                    'tcg_response' . $vendorId,
+                    ''
             );
             $wc_session->set(
-                'tcg_request' . $vendorId,
-                ''
+                    'tcg_request' . $vendorId,
+                    ''
 
             );
             $wc_session->set(
-                'tcg_quote_response' . $vendorId,
-                ''
+                    'tcg_quote_response' . $vendorId,
+                    ''
             );
         }
     }
@@ -1516,9 +1603,9 @@ HTML;
      */
     private
     function updateCachedQuoteResponse(
-        $quoteResponse,
-        $vendorId
-    ){
+            $quoteResponse,
+            $vendorId
+    ) {
         $ts = time();
 
         if (count($quoteResponse) > 0) {
@@ -1529,12 +1616,12 @@ HTML;
 
         if ($wc_session = WC()->session) {
             $wc_session->set(
-                'tcg_response' . $vendorId,
-                json_encode($quoteResponse)
+                    'tcg_response' . $vendorId,
+                    json_encode($quoteResponse)
             );
             $wc_session->set(
-                'tcg_response' . $vendorId,
-                json_encode($quoteResponse)
+                    'tcg_response' . $vendorId,
+                    json_encode($quoteResponse)
             );
             $wc_session->set('tcg_quote_response' . $vendorId, $quoteResponse);
         }
@@ -1547,12 +1634,12 @@ HTML;
      */
     private
     function getCachedQuoteResponse(
-        $vendorId
-    ){
+            $vendorId
+    ) {
         $vendorId = $vendorId === 0 ? '' : $vendorId;
         if ($wc_session = WC()->session) {
             $response = json_encode(
-                $wc_session->get('tcg_quote_response' . $vendorId)
+                    $wc_session->get('tcg_quote_response' . $vendorId)
             );
             if ($response != 'null' && strlen($response) > 2) {
                 $response = json_decode($response, true);
@@ -1574,9 +1661,9 @@ HTML;
      */
     private
     function updateCachedQuoteRequest(
-        $quoteParams,
-        $vendorId
-    ){
+            $quoteParams,
+            $vendorId
+    ) {
         // Current timestamp
         $ts = time();
 
@@ -1584,15 +1671,15 @@ HTML;
 
         if ($wc_session = WC()->session) {
             $wc_session->set(
-                'tcg_quote_request' . $vendorId,
-                hash('md5', json_encode($quoteParams) . $vendorId) . '||' . $ts
+                    'tcg_quote_request' . $vendorId,
+                    hash('md5', json_encode($quoteParams) . $vendorId) . '||' . $ts
             );
             $wc_session->set(
-                'tcg_request' . $vendorId,
-                hash(
-                    'md5',
-                    json_encode($quoteParams) . $vendorId . $ts
-                )
+                    'tcg_request' . $vendorId,
+                    hash(
+                            'md5',
+                            json_encode($quoteParams) . $vendorId . $ts
+                    )
             );
         }
     }
@@ -1606,9 +1693,9 @@ HTML;
      */
     private
     function compareCachedQuoteRequest(
-        $quoteParams,
-        $vendorId
-    ){
+            $quoteParams,
+            $vendorId
+    ) {
         $result = false;
 
         $tsnow = time();
@@ -1625,11 +1712,11 @@ HTML;
                     $hash = $parts[0];
                 }
                 $compareQuoteHash = hash(
-                    'md5',
-                    json_encode(
-                        $quoteParams,
-                        true
-                    ) . $vendorId
+                        'md5',
+                        json_encode(
+                                $quoteParams,
+                                true
+                        ) . $vendorId
                 );
                 if ($compareQuoteHash === $hash && abs($tsnow - $ts) < 300) {
                     $result = true;
@@ -1638,7 +1725,7 @@ HTML;
                 }
             } elseif ($wc_session) {
                 $cachedQuoteHash = $wc_session->get(
-                    'tcg_request' . $vendorId
+                        'tcg_request' . $vendorId
                 );
                 if (isset($cachedQuoteHash)) {
                     $parts = explode('||', $cachedQuoteHash);
@@ -1648,8 +1735,8 @@ HTML;
                     }
                 }
                 $compareQuoteHash = hash(
-                    'md5',
-                    json_encode($quoteParams, true) . $vendorId
+                        'md5',
+                        json_encode($quoteParams, true) . $vendorId
                 );
                 if ($compareQuoteHash == $hash && abs($tsnow - $ts) < 300) {
                     $result = true;

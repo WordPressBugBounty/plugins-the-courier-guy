@@ -43,7 +43,9 @@ class TCG_Shipping_Method extends WC_Shipping_Method
         }
 
         if ($wc_session = WC()->session) {
-            $wc_session->set('disable_specific_shipping_options', $this->disable_specific_shipping_options);
+            if ($tcg_config && isset($tcg_config['disable_specific_shipping_options'])) {
+                $wc_session->set('disable_specific_shipping_options', json_encode($tcg_config['disable_specific_shipping_options']));
+            }
         }
 
         $this->supports           = [
@@ -71,7 +73,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
 
         $this->parameters = $this->getShippingProperties();
         if (is_array($this->parameters) && count($this->parameters) > 0) {
-            $this->logging = isset($this->parameters['usemonolog']) && $this->parameters['usemonolog'] === 'yes';
+            $this->logging = isset($this->parameters['usemonolog']) ? $this->parameters['usemonolog'] === 'yes' : false;
             if ($this->logging && self::$log === null) {
                 self::$log = wc_get_logger();
             }
@@ -85,12 +87,18 @@ class TCG_Shipping_Method extends WC_Shipping_Method
 
     public static function shipLogicRateOptins()
     {
+        // Skip if we're on a WooCommerce Blocks checkout page
+        if (self::is_woocommerce_blocks_checkout()) {
+            return false;
+        }
+
         if ($wc_session = WC()->session) {
             $rates               = $wc_session->get(self::TCG_SHIP_LOGIC_RESULT);
             $rate_adjustment_ids = [];
 
             if (!isset($rates['rates']['rates'][0])) {
-                return false;
+                // Do not display anything if no rates
+                return;
             }
 
             if (!empty($rates['rates']['rates'][0]['rate_adjustments'])) {
@@ -110,29 +118,33 @@ class TCG_Shipping_Method extends WC_Shipping_Method
             }
 
             $disable_specific_options = json_decode($wc_session->get('disable_specific_shipping_options'));
-
-            if ($disable_specific_options == null) {
-                $disable_specific_options = array();
-                $count                    = 0;
-            } else {
-                $count = count($disable_specific_options);
+            $enabled_specific_options = $disable_specific_options;
+            if ($enabled_specific_options == null || empty($enabled_specific_options)) {
+                // Do not display anything if no enabled options
+                return;
             }
 
-            if (!empty($rates && isset($rates['opt_in_rates'])) && ($count > 0)) {
-                $html       = '<tr><th>Shipping Options</th><td><ul>';
+            if (!empty($rates && isset($rates['opt_in_rates']))) {
+                $html       = '';
                 $optinRates = $rates['opt_in_rates'];
+                $hasEnabledOption = false;
+
                 if (!empty($optinRates['opt_in_rates'])) {
                     foreach ($optinRates['opt_in_rates'] as $optin_rate) {
                         $optin_name = strtolower($optin_rate['name']);
                         $optin_name = str_replace("/", "", $optin_name);
                         $optin_name = str_replace("  ", " ", $optin_name);
                         $optin_name = str_replace(" ", "_", $optin_name);
-                        if (in_array($optin_name, $disable_specific_options)) {
-                            $tcg_ship_logic_optin_chosen = in_array($optin_rate['id'], $rate_adjustment_ids);
-                            $price                       = wc_price($optin_rate['charge_value']);
-                            $html                        .= "
+                        if (in_array($optin_name, $enabled_specific_options)) {
+                            if (!$hasEnabledOption) {
+                                $html .= '<tr id="tcg_shipping_options"><th>Shipping Options</th><td><ul>';
+                                $hasEnabledOption = true;
+                            }
+                            $tcg_ship_logic_option_chosen = in_array($optin_rate['id'], $rate_adjustment_ids);
+                            $price = wc_price($optin_rate['charge_value']);
+                            $html .= "
 <li class='update_totals_on_change'><input type='checkbox' value='$optin_rate[id]' name='tcg_ship_logic_optins[]' class='shipping-method update_totals_on_change'";
-                            if ($tcg_ship_logic_optin_chosen) {
+                            if ($tcg_ship_logic_option_chosen) {
                                 $html .= ' checked';
                             }
                             $html .= ">
@@ -150,13 +162,17 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                         $optin_name = str_replace("/", "", $optin_name);
                         $optin_name = str_replace("  ", " ", $optin_name);
                         $optin_name = str_replace(" ", "_", $optin_name);
-                        if (in_array($optin_name, $disable_specific_options)) {
+                        if (in_array($optin_name, $enabled_specific_options)) {
+                            if (!$hasEnabledOption) {
+                                $html .= '<tr id="tcg_shipping_options"><th>Shipping Options</th><td><ul>';
+                                $hasEnabledOption = true;
+                            }
                             $tcg_ship_logic_time_based_optin_chosen = in_array(
                                 $optin_rate['id'],
                                 $time_based_rate_adjustment_ids
                             );
-                            $price                                  = wc_price($optin_rate['charge_value']);
-                            $html                                   .= "
+                            $price = wc_price($optin_rate['charge_value']);
+                            $html .= "
 <li class='update_totals_on_change'><input type='checkbox' value='$optin_rate[id]' name='tcg_ship_logic_time_based_optins[]' class='shipping-method'";
                             if ($tcg_ship_logic_time_based_optin_chosen) {
                                 $html .= ' checked';
@@ -170,8 +186,11 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                         }
                     }
                 }
-                $html .= '</ul></td>';
-                echo $html;
+                if ($hasEnabledOption) {
+                    $html .= '</ul></td>';
+                    echo $html;
+                }
+                // If no enabled options, display nothing
             }
         }
     }
@@ -218,7 +237,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
     /**
      * @param array|null $settings
      *
-     * @return array|null
+     * @return void
      */
     public function setShipLogicApiCredentials(?array $settings = [])
     {
@@ -283,6 +302,16 @@ class TCG_Shipping_Method extends WC_Shipping_Method
             $package['insurance'] = true;
         }
 
+        // blocks check session for insurance
+        $x = $wc_session->get('tcg_billing_insurance');
+        if (self::is_woocommerce_blocks_checkout() && $parameters['billing_insurance'] === "yes") {
+            if ($wc_session && $wc_session->get('tcg_billing_insurance') == '1') {
+                $package['insurance'] = true;
+            } else {
+                $package['insurance'] = false;
+            }
+        }
+
         if (isset($postdata['billing_company'])) {
             $package['billing_company'] = $postdata['billing_company'];
         }
@@ -295,7 +324,9 @@ class TCG_Shipping_Method extends WC_Shipping_Method
             }
         }
 
-        self::$log?->add('thecourierguy', 'Calculate_shipping package: ' . json_encode($package));
+        if (self::$log) {
+            self::$log->add('thecourierguy', 'Calculate_shipping package: ' . json_encode($package));
+        }
 
         $vendor_id = '';
         if (isset($package['vendor_id'])) {
@@ -310,12 +341,25 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                 $package['billing_company'] = $company;
 
                 //Add insurance from session
-                $insurance_check = $wc_session->get('tcg_insurance');
+                $insurance_check = $wc_session->get('tcg_billing_insurance');
                 if ($insurance_check === 1 || $insurance_check === "1") {
                     $package['insurance'] = true;
                 }
             }
 
+            // Guard: ensure destination is complete before requesting rates
+            $dest = $package['destination'] ?? [];
+            $required_keys = ['country', 'state', 'postcode', 'city', 'address'];
+            $has_all = true;
+            foreach ($required_keys as $key) {
+                if (empty($dest[$key])) {
+                    $has_all = false;
+                    break;
+                }
+            }
+            if (!$has_all) {
+                return; // Skip Shiplogic call until address is provided
+            }
 
             $wc_session->set(self::TCG_SHIP_LOGIC_RESULT, null);
             foreach ($package['contents'] as $content) {
@@ -337,21 +381,20 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                 if (isset($result['rates']) && $result['rates']['message'] === 'Success') {
                     $wc_session->set(self::TCG_SHIP_LOGIC_RESULT, $result);
                     $base_rates = $result['rates']['rates'];
+
+                    // Note: Extra options costs are handled separately as line items
+                    // We don't add them to the base shipping rates to avoid double charging
+
                     foreach ($base_rates as $base_rate) {
                         $rate_adjustments_cost = 0;
                         foreach ($base_rate['rate_adjustments'] as $rate_adjustments) {
                             $rate_adjustments_cost += $rate_adjustments['charge'];
                         }
-                        $name = 'The Courier Guy ' . $base_rate['service_level']['code'] . ': ';
-                        if (!empty($base_rate['time_based_rate_adjustments'] && !empty($base_rate['rate_adjustments']))) {
-                            $name .= $base_rate['time_based_rate_adjustments'][0]['name'] . ': ';
-                            $name .= $base_rate['rate_adjustments'][0]['name'];
-                        } elseif (!empty($base_rate['time_based_rate_adjustments'])) {
-                            $name .= $base_rate['time_based_rate_adjustments'][0]['name'];
-                        } elseif (!empty($base_rate['rate_adjustments'])) {
-                            $name .= $base_rate['rate_adjustments'][0]['name'];
+
+                        if (str_starts_with($base_rate['service_level']['code'], 'D2L')) {
+                            $name = 'The Courier Guy Locker: ' . $base_rate['service_level']['code'] . '';
                         } else {
-                            $name .= 'Fuel charge';
+                            $name = 'The Courier Guy ' . $base_rate['service_level']['code'] . ': Fuel charge';
                         }
 
                         $insurance_charge = 0;
@@ -379,6 +422,9 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                             $ship_price = $base_rate['rate_excluding_vat'];
                         }
 
+                        // Extra options are handled separately as line items
+                        // Don't add them to the base shipping rate
+
                         $rate        = [
                             'name'             => $name,
                             'cost'             => $ship_price,
@@ -395,9 +441,10 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                         $rates[]     = $rate;
                     }
                 }
-                self::$log?->add('thecourierguy', 'Calculate_shipping result: ' . json_encode($result));
-
-                if (isset($result['error']) && str_contains($result['message'], 'Too Long')) {
+                if (self::$log) {
+                    self::$log->add('thecourierguy', 'Calculate_shipping result: ' . json_encode($result));
+                }
+                if (isset($result['error']) && strpos($result['message'], 'Too Long') !== false) {
                     wc_clear_notices();
                     wc_add_notice('Too many items for TCG. Please split your order', 'error');
                     $haveResult = true;
@@ -433,8 +480,22 @@ class TCG_Shipping_Method extends WC_Shipping_Method
 
     public static function is_woocommerce_blocks_checkout()
     {
+        // Check if we're in a WooCommerce Store API request
+        if (defined('REST_REQUEST') && REST_REQUEST) {
+            $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+            if (strpos($request_uri, '/wc/store/') !== false) {
+                return true;
+            }
+        }
+
+        // Check session for blocks flag
+        if (WC()->session && WC()->session->get('is_blocks') === 1) {
+            return true;
+        }
+
+        // Check content for blocks
         $content = get_the_content();
-        if (str_contains($content, 'wp-block-woocommerce-checkout')) {
+        if ($content && strpos($content, 'wp-block-woocommerce-checkout') !== false) {
             return true;
         }
 
@@ -529,7 +590,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                             <input data-service-id="<?php
                             echo esc_attr($option_key); ?>" class="<?= $class; ?> input-text regular-input <?php
                             echo esc_attr($data['class']); ?>-input"
-                                   type="text"<?= $style; ?> value="<?= $overrideValues[$option_key] ?? ''; ?>"/>
+                                   type="text"<?= $style; ?> value="<?= isset($overrideValues[$option_key]) ? $overrideValues[$option_key] : ''; ?>"/>
                         </span>
                     <?php
                     endforeach; ?>
@@ -599,7 +660,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                     disabled($data['disabled']); ?> <?php
                     echo $this->get_custom_attribute_html($data); ?>>
                         <?php
-                        foreach ($data['options'] as $option_key => $option_value) : ?>
+                        foreach ((array)$data['options'] as $option_key => $option_value) : ?>
                             <option value="<?php
                             echo esc_attr($option_value); ?>" <?php
                             selected($option_value, esc_attr($this->get_option($key))); ?>><?php
@@ -675,7 +736,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                     disabled($data['disabled']); ?> <?php
                     echo $this->get_custom_attribute_html($data); ?>>
                         <?php
-                        foreach ($data['options'] as $option_key => $option_value) : ?>
+                        foreach ((array)$data['options'] as $option_key => $option_value) : ?>
                             <option value="<?php
                             echo esc_attr($option_key); ?>" <?php
                             selected($option_key, esc_attr($this->get_option($key))); ?>><?php
@@ -872,12 +933,14 @@ class TCG_Shipping_Method extends WC_Shipping_Method
         if (empty($excludes)) {
             $excludes = [];
         }
-        return array_filter(
+        $filteredRates = array_filter(
             $rates,
             function ($rate) use ($excludes) {
-                return !in_array($rate['service'], $excludes);
+                return (!in_array($rate['service'], $excludes));
             }
         );
+
+        return $filteredRates;
     }
 
     /**
@@ -1118,6 +1181,13 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                 'description' => __('VAT applies or not', 'the-courier-guy'),
                 'default'     => __('taxable', 'the-courier-guy')
             ],
+            'enable_tcg_lockers'                    => [
+                'title'       => __('Enable TCG locker deliveries', 'the-courier-guy'),
+                'type'        => 'select',
+                'options'     => ['0' => 'No', '1' => 'Yes'],
+                'description' => __('Enable TCG lockers as an option for deliveries', 'the-courier-guy'),
+                'default'     => '0'
+            ],
             'company_name'                          => [
                 'title'       => __('Company Name', 'the-courier-guy'),
                 'type'        => 'text',
@@ -1170,7 +1240,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                     'the-courier-guy'
                 ),
                 'options'     => WC()->countries->get_countries(),
-                'default'     => __('ZA', 'the-courier-guy'),
+                'default'     =>  __('ZA', 'the-courier-guy'),
             ],
             'shopPostalCode'                        => [
                 'title'       => __('Shop Postal Code', 'the-courier-guy'),
@@ -1243,7 +1313,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                 'title'       => __('Percentage Markup', 'the-courier-guy'),
                 'type'        => 'tcg_percentage',
                 'description' => __('Percentage markup to be applied to each quote.', 'the-courier-guy'),
-                'default'     => '',
+                'default'     => ''
             ],
             'automatically_submit_collection_order' => [
                 'title'       => __('Automatically Submit Collection Order', 'the-courier-guy'),
@@ -1452,18 +1522,16 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                 'type'        => 'checkbox',
                 'description' => __(
                     'This will enable the shipping insurance field on the checkout page.<br>
-                     A product subtotal of R1500 and above is required to activate TCG insurance.<br>
-                     If you have WooCommerce Blocks, shipping insurance will be activated automatically<br>
-                      if the subtotal is above the threshold and this setting is selected.',
+                     A product subtotal of R1500 and above is required to activate TCG insurance.<br>',
                     'the-courier-guy'
                 ),
-                'default'     => 'no'
+                'default'     => __('no', 'the-courier-guy'),
             ],
             'free_shipping'                         => [
                 'title'       => __('Enable free shipping ', 'the-courier-guy'),
                 'type'        => 'checkbox',
                 'description' => __('This will enable free shipping over a specified amount', 'the-courier-guy'),
-                'default'     => 'no'
+                'default'     => __('no', 'the-courier-guy'),
             ],
             'rates_for_free_shipping'               => [
                 'title'             => __('Rates for free Shipping', 'the-courier-guy'),
@@ -1497,7 +1565,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                     'This will enable free shipping if the product is included in the basket',
                     'the-courier-guy'
                 ),
-                'default'     => 'no'
+                'default'     => __('no', 'the-courier-guy'),
             ],
             'usemonolog'                            => [
                 'title'       => __('Enable WooCommerce Logging', 'the-courier-guy'),
@@ -1517,7 +1585,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                         Method Box is not available for WooCommerce Blocks.',
                     'the-courier-guy'
                 ),
-                'default'     => 'no',
+                'default'     => __('no', 'the-courier-guy'),
             ],
             'enablenonstandardpackingbox'           => [
                 'title'       => __('Use non-standard packing algorithm', 'the-courier-guy'),
@@ -1526,7 +1594,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                     'Check this to use the non-standard packing algorithm.<br> This is more accurate but will also use more server resources and may fail on shared servers.',
                     'the-courier-guy'
                 ),
-                'default'     => 'no',
+                'default'     => __('no', 'the-courier-guy'),
             ],
             'displaymessageifnorates'               => [
                 'title'       => __('Enable display message if no rates', 'the-courier-guy'),
@@ -1535,14 +1603,14 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                     'Check this to display a message on checkout if there are no shipping options for a desired package and address.',
                     'the-courier-guy'
                 ),
-                'default'     => 'yes',
+                'default'     => __('yes', 'the-courier-guy'),
             ],
         ];
         $this->instance_form_fields = $fields;
     }
 
     /**
-     * @return stdClass
+     * @return array|mixed|object
      */
     private function getAvailableShippingOptions()
     {
@@ -1567,7 +1635,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
     }
 
     /**
-     * @return stdClass
+     * @return array|mixed|object
      */
     private function getRateOptions()
     {
