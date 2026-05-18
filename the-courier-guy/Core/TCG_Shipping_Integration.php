@@ -1,5 +1,9 @@
 <?php
 
+if (!defined('ABSPATH')) {
+    exit;
+} // Exit if accessed directly
+
 use Automattic\WooCommerce\Blocks\Integrations\IntegrationInterface;
 
 class TCG_Shipping_Integration implements IntegrationInterface
@@ -58,6 +62,7 @@ class TCG_Shipping_Integration implements IntegrationInterface
         // Verify nonce
         if (!wp_verify_nonce($_POST['nonce'], 'wp_rest')) {
             wp_send_json_error('Invalid nonce');
+
             return;
         }
 
@@ -221,14 +226,14 @@ class TCG_Shipping_Integration implements IntegrationInterface
             // Add a simple test endpoint first
             register_rest_route('the-courier-guy/v1', 'test', [
                 'methods'             => 'GET',
-                'callback'            => function() {
+                'callback'            => function () {
                     return rest_ensure_response([
-                        'status' => 'success',
-                        'message' => 'TCG REST API is working',
-                        'timestamp' => current_time('c'),
-                        'wp_version' => get_bloginfo('version'),
-                        'wc_active' => function_exists('WC')
-                    ]);
+                                                    'status'     => 'success',
+                                                    'message'    => 'TCG REST API is working',
+                                                    'timestamp'  => current_time('c'),
+                                                    'wp_version' => get_bloginfo('version'),
+                                                    'wc_active'  => function_exists('WC')
+                                                ]);
                 },
                 'permission_callback' => '__return_true'
             ]);
@@ -256,16 +261,20 @@ class TCG_Shipping_Integration implements IntegrationInterface
                 'callback'            => [$this, 'set_insurance_status'],
                 'permission_callback' => '__return_true'
             ]);
-        } catch (Exception $e) {}
+        } catch (Exception $e) {
+        }
     }
 
     public function update_shipping_options_rest($request)
     {
-        $params = $request->get_params();
+        $params         = $request->get_params();
+        $selectedOptIns = [];
+        $rates          = WC()->session->get(TCG_Shipping_Method::TCG_SHIP_LOGIC_RESULT);
 
         if (WC()->session) {
             if (isset($params['tcg_ship_logic_optins'])) {
                 WC()->session->set('tcg_selected_optins', $params['tcg_ship_logic_optins']);
+                $selectedOptIns = $params['tcg_ship_logic_optins'];
             } else {
                 WC()->session->set('tcg_selected_optins', []);
             }
@@ -274,6 +283,25 @@ class TCG_Shipping_Integration implements IntegrationInterface
                 WC()->session->set('tcg_selected_time_based_optins', $params['tcg_ship_logic_time_based_optins']);
             } else {
                 WC()->session->set('tcg_selected_time_based_optins', []);
+            }
+
+            $totalOptInCost = 0.0;
+            if (!empty($selectedOptIns)) {
+                foreach ($selectedOptIns as $optIn) {
+                    foreach ($rates['opt_in_rates']['opt_in_rates'] as $optinRate) {
+                        if ($optinRate['id'] === (int)$optIn) {
+                            $totalOptInCost += (float)$optinRate['charge_value'];
+                        }
+                    }
+                }
+            }
+            WC()->session->set('tcg_shipping_extras', []);
+            if ($totalOptInCost > 0) {
+                WC()->session->set('tcg_shipping_extras', [
+                    'totalOptinCost' => $totalOptInCost,
+                    'selectedOptins' => $selectedOptIns,
+                ]);
+                WC()->cart->calculate_totals();
             }
 
             // Clear shipping cache to force recalculation
@@ -320,6 +348,7 @@ class TCG_Shipping_Integration implements IntegrationInterface
         if (WC()->session) {
             $checked = WC()->session->get('tcg_billing_insurance') == '1';
         }
+
         return rest_ensure_response([
                                         'enabled'    => $enabled,
                                         'checked'    => $checked,
@@ -338,10 +367,12 @@ class TCG_Shipping_Integration implements IntegrationInterface
             $packages = WC()->cart->get_shipping_packages();
             foreach ($packages as $package_key => $package) {
                 WC()->session->set('shipping_for_package_' . $package_key, null);
+                WC()->session->set('tcg_billing_insurance', $checked === '1' ? '1' : '0');
             }
             WC()->cart->calculate_shipping();
             WC()->cart->calculate_totals();
         }
+
         return rest_ensure_response(['success' => true, 'checked' => $checked]);
     }
 
@@ -352,10 +383,13 @@ class TCG_Shipping_Integration implements IntegrationInterface
             WC()->session = new WC_Session_Handler();
             WC()->session->init();
         }
+        $wcSession = WC()->session;
 
-        $rates = null;
+        $rates          = null;
+        $selectedOptIns = [];
         if (WC()->session) {
-            $rates = WC()->session->get(TCG_Shipping_Method::TCG_SHIP_LOGIC_RESULT);
+            $rates          = WC()->session->get(TCG_Shipping_Method::TCG_SHIP_LOGIC_RESULT);
+            $selectedOptIns = WC()->session->get('tcg_selected_optins') ?? [];
         }
 
         $shipping_options = [];
@@ -387,27 +421,45 @@ class TCG_Shipping_Integration implements IntegrationInterface
                 }
             }
 
-            $disable_specific_options = json_decode(
-                WC()->session->get('disable_specific_shipping_options'),
-                true
-            ) ?? [];
-            $optinRates               = $rates['opt_in_rates'];
+            $enable_specific_options = json_decode(
+                                           WC()->session->get('enable_specific_shipping_options'),
+                                           true
+                                       ) ?? [];
+            $optinRates              = $rates['opt_in_rates'];
 
+            $hideFreeShipping = get_option('woocommerce_shipping_hide_rates_when_free', 'no') === 'yes';
+            if ($hideFreeShipping) {
+                $zones                   = WC_Shipping_Zones::get_zones();
+                $free_shipping_available = false;
+                foreach ($zones as $zone) {
+                    foreach ($zone['shipping_methods'] as $method) {
+                        if ($method->id === 'free_shipping' && $method->enabled === 'yes') {
+                            $free_shipping_available = true;
+                            break 2;
+                        }
+                    }
+                }
+
+                if ($free_shipping_available) {
+                    // If free shipping is available and we're hiding other rates, skip displaying opt-in options
+                    return rest_ensure_response([]);
+                }
+            }
             if (!empty($optinRates['opt_in_rates'])) {
                 foreach ($optinRates['opt_in_rates'] as $optin_rate) {
-                    $optin_name = strtolower($optin_rate['name']);
+                    $optin_name = trim(strtolower($optin_rate['name']));
                     $optin_name = str_replace("/", "", $optin_name);
                     $optin_name = str_replace("  ", " ", $optin_name);
                     $optin_name = str_replace(" ", "_", $optin_name);
 
-                    if (in_array($optin_name, $disable_specific_options)) {
+                    if (is_array($enable_specific_options) && in_array($optin_name, $enable_specific_options)) {
                         $shipping_options[] = [
                             'id'              => $optin_rate['id'],
                             'name'            => $optin_rate['name'],
                             'price'           => $optin_rate['charge_value'],
                             'price_formatted' => wc_price($optin_rate['charge_value']),
                             'type'            => 'regular',
-                            'checked'         => in_array($optin_rate['id'], $rate_adjustment_ids)
+                            'checked'         => in_array($optin_rate['id'], $selectedOptIns)
                         ];
                     }
                 }
@@ -420,7 +472,7 @@ class TCG_Shipping_Integration implements IntegrationInterface
                     $optin_name = str_replace("  ", " ", $optin_name);
                     $optin_name = str_replace(" ", "_", $optin_name);
 
-                    if (in_array($optin_name, $disable_specific_options)) {
+                    if (is_array($enable_specific_options) && in_array($optin_name, $enable_specific_options)) {
                         $shipping_options[] = [
                             'id'              => $optin_rate['id'],
                             'name'            => $optin_rate['name'],
@@ -455,6 +507,7 @@ class TCG_Shipping_Integration implements IntegrationInterface
                 'description' => __('TCG Shipping Info', 'the-courier-guy'),
                 'api_url'     => home_url('/?rest_route=/the-courier-guy/v1/'),
                 'ajax_url'    => admin_url('admin-ajax.php'),
+                'batch_url'   => home_url('/wp-json/wc/store/v1/batch'),
                 'nonce'       => wp_create_nonce('wp_rest')
             ]
         );

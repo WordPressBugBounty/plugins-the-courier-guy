@@ -1,0 +1,139 @@
+.tcg-checkout-suburb-title {
+    display: none !important;
+}
+
+.tcg-quoteno {
+    display: none !important;
+}
+
+#billing_tcg_place_lookup_field .select2-container, #shipping_tcg_place_lookup_field .select2-container {
+    width: 100% !important;
+}
+
+#iihtcg_selector_input_collect {
+    margin-left: 5px !important;
+}
+
+#iihtcg_selector label {
+    display: inline-block;
+}
+
+.tcg-insurance-field {
+    display: block !important;
+}
+
+/* Apply CSS to evenly space the radio buttons and labels within <p> elements */
+#iihtcg_selector p {
+    margin-bottom: 10px; /* Adjust the margin as needed for spacing */
+    display: flex; /* Use flexbox for alignment */
+    align-items: center; /* Center items vertically */
+}
+
+/* Style the radio buttons and labels */
+#iihtcg_selector input[type="radio"] {
+    margin-right: 5px; /* Adjust the margin as needed for spacing */
+}
+
+#iihtcg_selector label {
+    display: inline; /* Make labels display inline with radio buttons */
+}
+
+/* TCG Checkout CSS */
+.tcg-shipping-options-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.tcg-shipping-option {
+    margin-bottom: 12px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #f9f9f9;
+}
+
+.tcg-option-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    gap: 8px;
+    margin: 0;
+}
+
+.tcg-option-checkbox,
+.tcg-option-radio {
+    margin-right: 8px;
+}
+
+.tcg-option-name {
+    flex: 1;
+    font-weight: 500;
+}
+
+.tcg-option-price {
+    font-weight: bold;
+    color: #2c5aa0;
+}
+
+.tcg-option-note {
+    font-size: 0.85em;
+    color: #666;
+    font-style: italic;
+    margin-left: auto;
+}
+
+.tcg-checkout-title {
+    border-bottom: 2px solid #2c5aa0;
+    padding-bottom: 8px;
+    margin-bottom: 16px;
+    margin: 0 0 1rem 0;
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+.tcg-checkout-content {
+    margin-top: 10px;
+}
+
+.tcg-checkout-block {
+    margin: 1rem 0;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #f9f9f9;
+}
+
+.tcg-shipping-options-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.tcg-shipping-option {
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 3px;
+    background: white;
+}
+
+.tcg-option-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    margin: 0;
+}
+
+.tcg-option-checkbox {
+    margin-right: 0.5rem;
+}
+
+.tcg-option-name {
+    flex: 1;
+}
+
+.tcg-option-price {
+    font-weight: 600;
+    color: #333;
+}

@@ -1,9 +1,9 @@
 === The Courier Guy Shipping for WooCommerce ===
 Tags: ecommerce, e-commerce, woocommerce, shipping, courier
 Requires at least: 6.0
-Tested up to: 6.8
+Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 5.4.0
+Stable tag: 5.5.0
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -379,6 +379,22 @@ We often suggest that the clients do not exclude the following shipping methods
 
 
 == Changelog ==
+
+= 5.5.0 - May 18, 2026
+* Updated 'https://api.thecourierguy.co.za/v2/' to 'https://api.portal.thecourierguy.co.za/v2/'.
+* Refactored core API classes for improved code quality, security, and maintainability.
+* Updated logic for rendering checkout blocks in frontend JavaScript for better WooCommerce Blocks and classic checkout compatibility.
+* Encryption and secure storage of API keys.
+* Support for PHP 8.3.
+* Improved rate caching and performance.
+* Rate re-calculation prior to creating shipments to ensure rates have not expired.
+* Add an option to exclude products from free shipping.
+* Improved escaping of output, elimination of security warnings.
+* Improved handling of locker rates and opt-in rates in API logic.
+* Various bug fixes and code style improvements across PHP and JS files.
+* Minor fixes in vendor dependencies for better compatibility.
+* Removed legacy code for TCG suburb/area functionality.
+
 = 5.4.0 - December 08, 2025
 * D2L (Door to Locker) TCG Locker Functionality: Integrated Basic TCG locker delivery options via Shiplogic API based on customer's delivery city.
 * Method Box Shipping Display Issue: Fixed shipping totals and options visibility toggle when switching between courier and collection modes.

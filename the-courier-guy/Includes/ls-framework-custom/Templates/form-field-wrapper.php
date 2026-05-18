@@ -1,5 +1,12 @@
+<?php
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+// Exit if accessed directly
+?>
 <p>
-    <label><?= $properties['display_name'] . ':'; ?></label>
+    <label><?= esc_attr($properties['display_name'] . ':'); ?></label>
     <?php
     include($formFieldTemplateFile);
     ?>

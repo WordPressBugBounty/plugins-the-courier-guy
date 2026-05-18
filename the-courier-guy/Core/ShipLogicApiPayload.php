@@ -5,14 +5,18 @@
  * @package tcg/core
  */
 
+if (!defined('ABSPATH')) {
+    exit;
+} // Exit if accessed directly
+
 require_once 'ShipLogicContentPayload.php';
 
 class ShipLogicApiPayload
 {
-    public static    $r1;
-    public static    $j;
+    public static $r1;
+    public static $j;
     protected static $log;
-    public           $globalFactor = 50;
+    public $globalFactor = 50;
 
     /**
      * ShipLogicApiPayload constructor.
@@ -224,7 +228,7 @@ class ShipLogicApiPayload
         if (count($globalParcells) > 1) {
             usort(
                 $globalParcells,
-                function ($a, $b){
+                function ($a, $b) {
                     if ($a[0] === $b[0]) {
                         return 0;
                     }
@@ -323,7 +327,7 @@ class ShipLogicApiPayload
         // Order the fitting items with the biggest dimension first
         usort(
             $fittingItems,
-            function ($a, $b) use ($all_items, $fittingItems){
+            function ($a, $b) use ($all_items, $fittingItems) {
                 $itema         = $a['item'];
                 $itemb         = $b['item'];
                 $producta_size = max(
@@ -417,7 +421,7 @@ class ShipLogicApiPayload
             $entry['dim3']    = $dim[2];
             $entry['actmass'] = $item['dimensions']['mass'];
 
-            for ($i = 0; $i < $tooBigItem['item']['quantity']; $i++) {
+            for ($i = 1; $i < $tooBigItem['item']['quantity']; $i++) {
                 $entry['item']        = $j;
                 $entry['description'] = !$waybillDescriptionOverride ? $slug : 'Item';
                 $entry['itemCount']   = 1;
@@ -441,6 +445,7 @@ class ShipLogicApiPayload
                 $flat[] = $val;
             }
         }
+
         return array_unique($flat);
     }
 
@@ -501,8 +506,8 @@ class ShipLogicApiPayload
             $fitted[$key]['item']['slug']               = $grp_name;
             $fitted[$key]['item']['dimensions']         = $grp_dimensions;
             $fitted[$key]['item']['dimensions']['mass'] = (is_numeric(
-                    $grp_quantity
-                ) && $grp_quantity != 0) ? $grp_mass / $grp_quantity : 0;
+                                                               $grp_quantity
+                                                           ) && $grp_quantity != 0) ? $grp_mass / $grp_quantity : 0;
             $fitted[$key]['item']['item']['quantity']   = $grp_quantity;
         }
 
@@ -512,6 +517,7 @@ class ShipLogicApiPayload
     /**
      * @param $product
      * @param null $item_product_id
+     *
      * @return bool
      */
     private function isSingleProductItem($product, $item_product_id = null): bool
@@ -589,7 +595,7 @@ class ShipLogicApiPayload
      */
     private function getServiceIdentifierFromShippingItem(
         array $shippingItem
-    ): string{
+    ): string {
         $method      = $shippingItem['method_id'];
         $methodParts = explode(':', $method);
 

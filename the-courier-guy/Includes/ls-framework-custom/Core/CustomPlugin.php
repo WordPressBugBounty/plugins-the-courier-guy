@@ -4,6 +4,9 @@
  * @author The Courier Guy
  * @package ls-framework/core
  */
+if (!defined('ABSPATH')) {
+    exit;
+} // Exit if accessed directly
 if (!function_exists('get_plugin_data')) {
     require_once(ABSPATH . 'wp-admin/includes/plugin.php');
 }

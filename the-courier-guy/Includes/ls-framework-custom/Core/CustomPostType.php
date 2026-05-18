@@ -4,6 +4,10 @@
  * @author The Courier Guy
  * @package ls-framework/core
  */
+
+if (!defined('ABSPATH')) {
+    exit;
+} // Exit if accessed directly
 class CustomPostType
 {
 
@@ -151,7 +155,37 @@ class CustomPostType
                 include($templateFilePath . 'form-field-wrapper.php');
                 $formField = ob_get_contents();
                 ob_end_clean();
-                echo $formField;
+                echo wp_kses(
+                    $formField,
+                    [
+                        'div'      => [
+                            'class' => []
+                        ],
+                        'label'    => [
+                            'for' => []
+                        ],
+                        'input'    => [
+                            'type'        => [],
+                            'name'        => [],
+                            'id'          => [],
+                            'value'       => [],
+                            'placeholder' => [],
+                            'readonly'    => [],
+                            'checked'     => []
+                        ],
+                        'textarea' => [
+                            'name'        => [],
+                            'id'          => [],
+                            'rows'        => [],
+                            'cols'        => [],
+                            'placeholder' => [],
+                            'readonly'    => []
+                        ],
+                        'p'        => [
+                            'class' => []
+                        ]
+                    ]
+                );
             }
         );
     }

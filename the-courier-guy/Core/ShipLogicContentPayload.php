@@ -1,6 +1,8 @@
 <?php
 
-
+if (!defined('ABSPATH')) {
+    exit;
+} // Exit if accessed directly
 class ShipLogicContentPayload
 {
 
@@ -46,9 +48,15 @@ class ShipLogicContentPayload
 
         $maxItems = 0;
         foreach ($boxPermutations as $key => $permutation) {
-            $boxItems = (is_numeric($package[$permutation[0]]) && $package[$permutation[0]] != 0) ? (int)($parcel[0] / $package[$permutation[0]]) : 0;
-            $boxItems *= (is_numeric($package[$permutation[1]]) && $package[$permutation[1]] != 0) ? (int)($parcel[1] / $package[$permutation[1]]) : 0;
-            $boxItems *= (is_numeric($package[$permutation[2]]) && $package[$permutation[2]] != 0) ? (int)($parcel[2] / $package[$permutation[2]]) : 0;
+            $boxItems = (is_numeric(
+                             $package[$permutation[0]]
+                         ) && $package[$permutation[0]] != 0) ? (int)($parcel[0] / $package[$permutation[0]]) : 0;
+            $boxItems *= (is_numeric(
+                              $package[$permutation[1]]
+                          ) && $package[$permutation[1]] != 0) ? (int)($parcel[1] / $package[$permutation[1]]) : 0;
+            $boxItems *= (is_numeric(
+                              $package[$permutation[2]]
+                          ) && $package[$permutation[2]] != 0) ? (int)($parcel[2] / $package[$permutation[2]]) : 0;
             $maxItems = max($maxItems, $boxItems);
         }
 
@@ -79,8 +87,12 @@ class ShipLogicContentPayload
 
         $usedHeight = $parcel[2];
         foreach ($boxPermutations as $permutation) {
-            $nl = (is_numeric($package[$permutation[0]]) && $package[$permutation[0]] != 0) ? (int)($parcel[0] / $package[$permutation[0]]) : 0;
-            $nw = (is_numeric($package[$permutation[1]]) && $package[$permutation[1]] != 0) ? (int)($parcel[1] / $package[$permutation[1]]) : 0;
+            $nl = (is_numeric(
+                       $package[$permutation[0]]
+                   ) && $package[$permutation[0]] != 0) ? (int)($parcel[0] / $package[$permutation[0]]) : 0;
+            $nw = (is_numeric(
+                       $package[$permutation[1]]
+                   ) && $package[$permutation[1]] != 0) ? (int)($parcel[1] / $package[$permutation[1]]) : 0;
             $na = $nl * $nw;
             if ($na !== 0) {
                 $h = ceil($count / ($nl * $nw)) * $package[$permutation[2]];
@@ -111,8 +123,12 @@ class ShipLogicContentPayload
         $usedHeight = $parcel[2];
         $useds      = [];
         foreach ($boxPermutations as $permutation) {
-            $nl = (is_numeric($package[$permutation[0]]) && $package[$permutation[0]] != 0) ? (int)($parcel[0] / $package[$permutation[0]]) : 0;
-            $nw = (is_numeric($package[$permutation[1]]) && $package[$permutation[1]] != 0) ? (int)($parcel[1] / $package[$permutation[1]]) : 0;
+            $nl = (is_numeric(
+                       $package[$permutation[0]]
+                   ) && $package[$permutation[0]] != 0) ? (int)($parcel[0] / $package[$permutation[0]]) : 0;
+            $nw = (is_numeric(
+                       $package[$permutation[1]]
+                   ) && $package[$permutation[1]] != 0) ? (int)($parcel[1] / $package[$permutation[1]]) : 0;
             $na = $nl * $nw;
             $h  = 0;
             if ($na !== 0) {
@@ -607,7 +623,9 @@ class ShipLogicContentPayload
 
         $config = [];
         foreach ($parcels as $parcel) {
-            $n = (is_numeric($parcel['volume']) && $parcel['volume'] != 0) ? $totalVolume / (float)$parcel['volume'] : 0;
+            $n        = (is_numeric(
+                             $parcel['volume']
+                         ) && $parcel['volume'] != 0) ? $totalVolume / (float)$parcel['volume'] : 0;
             $config[] = $n;
         }
 

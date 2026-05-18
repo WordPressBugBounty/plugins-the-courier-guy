@@ -4,6 +4,10 @@
  * @author The Courier Guy
  * @package ls-framework/core
  */
+
+if (!defined('ABSPATH')) {
+    exit;
+} // Exit if accessed directly
 class CustomPluginDependencies
 {
 
@@ -23,8 +27,8 @@ class CustomPluginDependencies
             $this->activePlugins = (array)get_option('active_plugins', array());
             if (is_multisite()) {
                 $this->activePlugins = array_merge(
-                    $this->activePlugins,
-                    get_site_option('active_sitewide_plugins', array())
+                        $this->activePlugins,
+                        get_site_option('active_sitewide_plugins', array())
                 );
             }
         }
@@ -59,12 +63,12 @@ class CustomPluginDependencies
     {
         $dependenciesValidated = true;
         array_walk(
-            $dependencies,
-            function ($dependencyValues, $dependencyPath) {
-                if (!$this->validateDependency($dependencyPath)) {
-                    $this->addInvalidatedPlugins($dependencyPath, $dependencyValues);
+                $dependencies,
+                function ($dependencyValues, $dependencyPath) {
+                    if (!$this->validateDependency($dependencyPath)) {
+                        $this->addInvalidatedPlugins($dependencyPath, $dependencyValues);
+                    }
                 }
-            }
         );
         $invalidPlugins = $this->getInvalidatedPlugins();
         if (!empty($invalidPlugins)) {
@@ -82,17 +86,17 @@ class CustomPluginDependencies
     {
         $invalidatedPlugins = $this->getInvalidatedPlugins();
         array_walk(
-            $invalidatedPlugins,
-            function ($invalidatedPlugin) {
-                $notice = __($invalidatedPlugin['notice'], 'the-courier-guy');
-                ?>
-                <div id="message" class="error">
-                    <p>
-                        <?= $notice; ?>
-                    </p>
-                </div>
-                <?php
-            }
+                $invalidatedPlugins,
+                function ($invalidatedPlugin) {
+                    $notice = __($invalidatedPlugin['notice'], 'the-courier-guy');
+                    ?>
+                    <div id="message" class="error">
+                        <p>
+                            <?= esc_html__($notice); ?>
+                        </p>
+                    </div>
+                    <?php
+                }
         );
     }
 
@@ -104,9 +108,9 @@ class CustomPluginDependencies
     private function validateDependency($dependencyPath)
     {
         return (in_array($dependencyPath, $this->activePlugins) || array_key_exists(
-                $dependencyPath,
-                $this->activePlugins
-            ));
+                        $dependencyPath,
+                        $this->activePlugins
+                ));
     }
 
     /**

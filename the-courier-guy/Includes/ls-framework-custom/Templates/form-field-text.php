@@ -1,2 +1,9 @@
-<input type="text" id="<?= $identifier; ?>" name="<?= $identifier; ?>" value="<?= htmlentities($value); ?>"
-       class="widefat"<?= $readonly; ?> />
+<?php
+
+if (!defined('ABSPATH')) {
+    exit;
+} // Exit if accessed directly
+?>
+<input type="text" id="<?= esc_attr($identifier); ?>" name="<?= esc_attr($identifier); ?>"
+       value="<?= esc_attr(htmlentities($value)); ?>"
+       class="widefat"<?= esc_attr($readonly); ?> />
