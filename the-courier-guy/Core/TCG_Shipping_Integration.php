@@ -36,6 +36,41 @@ class TCG_Shipping_Integration implements IntegrationInterface
         add_action('rest_api_init', [$this, 'register_rest_api']);
     }
 
+    /**
+     * Check if The Courier Guy shipping method is enabled in any shipping zone.
+     * This ensures shipping options are only displayed when the method is actually available.
+     *
+     * @return bool True if TCG is enabled in any zone, false otherwise
+     */
+    private function is_tcg_enabled_in_any_zone(): bool
+    {
+        $zones        = WC_Shipping_Zones::get_zones();
+        $default_zone = WC_Shipping_Zones::get_zone(0);
+        if ($default_zone) {
+            $zones[] = [
+                'shipping_methods' => $default_zone->get_shipping_methods(true),
+            ];
+        }
+
+        foreach ($zones as $zone) {
+            if (empty($zone['shipping_methods']) || !is_array($zone['shipping_methods'])) {
+                continue;
+            }
+
+            foreach ($zone['shipping_methods'] as $method) {
+                if (!isset($method->id) || $method->id !== 'the_courier_guy') {
+                    continue;
+                }
+
+                $enabled = $method->enabled ?? 'no';
+                if ($enabled === 'yes') {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 
     public function register_checkout_hooks()
     {
@@ -94,10 +129,10 @@ class TCG_Shipping_Integration implements IntegrationInterface
         }
 
         wp_send_json_success([
-                                 'message'             => 'Shipping options updated',
-                                 'selected_regular'    => $_POST['tcg_ship_logic_optins'] ?? [],
-                                 'selected_time_based' => $_POST['tcg_ship_logic_time_based_optins'] ?? []
-                             ]);
+            'message'             => 'Shipping options updated',
+            'selected_regular'    => $_POST['tcg_ship_logic_optins'] ?? [],
+            'selected_time_based' => $_POST['tcg_ship_logic_time_based_optins'] ?? []
+        ]);
     }
 
     public function capture_shipping_options($customer)
@@ -228,12 +263,12 @@ class TCG_Shipping_Integration implements IntegrationInterface
                 'methods'             => 'GET',
                 'callback'            => function () {
                     return rest_ensure_response([
-                                                    'status'     => 'success',
-                                                    'message'    => 'TCG REST API is working',
-                                                    'timestamp'  => current_time('c'),
-                                                    'wp_version' => get_bloginfo('version'),
-                                                    'wc_active'  => function_exists('WC')
-                                                ]);
+                        'status'     => 'success',
+                        'message'    => 'TCG REST API is working',
+                        'timestamp'  => current_time('c'),
+                        'wp_version' => get_bloginfo('version'),
+                        'wc_active'  => function_exists('WC')
+                    ]);
                 },
                 'permission_callback' => '__return_true'
             ]);
@@ -318,17 +353,17 @@ class TCG_Shipping_Integration implements IntegrationInterface
             WC()->cart->calculate_totals();
 
             return rest_ensure_response([
-                                            'success'             => true,
-                                            'message'             => 'Shipping options updated',
-                                            'selected_regular'    => $params['tcg_ship_logic_optins'] ?? [],
-                                            'selected_time_based' => $params['tcg_ship_logic_time_based_optins'] ?? []
-                                        ]);
+                'success'             => true,
+                'message'             => 'Shipping options updated',
+                'selected_regular'    => $params['tcg_ship_logic_optins'] ?? [],
+                'selected_time_based' => $params['tcg_ship_logic_time_based_optins'] ?? []
+            ]);
         }
 
         return rest_ensure_response([
-                                        'success' => false,
-                                        'message' => 'Session not available'
-                                    ]);
+            'success' => false,
+            'message' => 'Session not available'
+        ]);
     }
 
     public function get_insurance_status($request)
@@ -336,6 +371,15 @@ class TCG_Shipping_Integration implements IntegrationInterface
         $enabled    = false;
         $checked    = false;
         $cart_total = 0;
+
+        // Check if TCG is enabled in any shipping zone
+        if (!$this->is_tcg_enabled_in_any_zone()) {
+            return rest_ensure_response([
+                'enabled'    => false,
+                'checked'    => false,
+                'cart_total' => 0
+            ]);
+        }
 
         if (WC()->cart) {
             $cart_total = WC()->cart->subtotal;
@@ -350,16 +394,17 @@ class TCG_Shipping_Integration implements IntegrationInterface
         }
 
         return rest_ensure_response([
-                                        'enabled'    => $enabled,
-                                        'checked'    => $checked,
-                                        'cart_total' => $cart_total
-                                    ]);
+            'enabled'    => $enabled,
+            'checked'    => $checked,
+            'cart_total' => $cart_total
+        ]);
     }
 
     public function set_insurance_status($request)
     {
         $params  = $request->get_params();
-        $checked = !empty($params['checked']) ? '1' : '0';
+        $checked = (int)($params['checked'] ?? false) === 1;
+        $checked = $checked ? '1' : '0';
         if (WC()->session) {
             WC()->session->set('tcg_billing_insurance', $checked);
             // Clear shipping cache to force recalculation
@@ -367,10 +412,11 @@ class TCG_Shipping_Integration implements IntegrationInterface
             $packages = WC()->cart->get_shipping_packages();
             foreach ($packages as $package_key => $package) {
                 WC()->session->set('shipping_for_package_' . $package_key, null);
-                WC()->session->set('tcg_billing_insurance', $checked === '1' ? '1' : '0');
             }
             WC()->cart->calculate_shipping();
             WC()->cart->calculate_totals();
+        } else {
+            return rest_ensure_response(['success' => false, 'message' => 'Session not available']);
         }
 
         return rest_ensure_response(['success' => true, 'checked' => $checked]);
@@ -383,6 +429,18 @@ class TCG_Shipping_Integration implements IntegrationInterface
             WC()->session = new WC_Session_Handler();
             WC()->session->init();
         }
+
+        $shippingMethodSettings = TCG_Plugin::getShippingMethodSettings();
+
+        if (($shippingMethodSettings['enabled'] ?? 'no') !== 'yes') {
+            return rest_ensure_response([]);
+        }
+
+        // Check if TCG is enabled in any shipping zone
+        if (!$this->is_tcg_enabled_in_any_zone()) {
+            return rest_ensure_response([]);
+        }
+
         $wcSession = WC()->session;
 
         $rates          = null;
@@ -492,6 +550,8 @@ class TCG_Shipping_Integration implements IntegrationInterface
     // REST API and shipping options functionality is working
     public function register_frontend_scripts()
     {
+        $shippingMethodSettings = TCG_Plugin::getShippingMethodSettings();
+
         wp_register_script(
             'tcg-blocks-frontend',
             plugins_url('../dist/js/frontend/blocks.js', __FILE__),
@@ -508,7 +568,8 @@ class TCG_Shipping_Integration implements IntegrationInterface
                 'api_url'     => home_url('/?rest_route=/the-courier-guy/v1/'),
                 'ajax_url'    => admin_url('admin-ajax.php'),
                 'batch_url'   => home_url('/wp-json/wc/store/v1/batch'),
-                'nonce'       => wp_create_nonce('wp_rest')
+                'nonce'       => wp_create_nonce('wp_rest'),
+                'tcg_enabled' => $shippingMethodSettings['enabled'] ?? 'no'
             ]
         );
     }

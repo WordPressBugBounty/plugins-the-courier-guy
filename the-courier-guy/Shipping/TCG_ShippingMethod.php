@@ -16,7 +16,7 @@ $pluginpath = plugin_dir_path(__DIR__);
 class TCG_Shipping_Method extends WC_Shipping_Method
 {
     const TCG_SHIP_LOGIC_RESULT = 'tcg_ship_logic_result';
-    const INSURANCE_THRESHOLD = 1000;
+    const INSURANCE_THRESHOLD   = 1000;
     /**
      * @var WC_Logger
      */
@@ -104,6 +104,11 @@ class TCG_Shipping_Method extends WC_Shipping_Method
     {
         // Skip if we're on a WooCommerce Blocks checkout page
         if (self::is_woocommerce_blocks_checkout()) {
+            return false;
+        }
+
+        // Classic checkout: only render TCG options when the selected TCG method instance is enabled.
+        if (!self::is_selected_tcg_method_enabled_for_classic_checkout()) {
             return false;
         }
 
@@ -265,6 +270,78 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                 // If no enabled options, display nothing
             }
         }
+    }
+
+    /**
+     * Determines whether the currently selected classic-checkout shipping method
+     * is a TCG method instance that is enabled in shipping zones.
+     */
+    private static function is_selected_tcg_method_enabled_for_classic_checkout(): bool
+    {
+        if (!WC()->session) {
+            return false;
+        }
+
+        $chosen_methods = WC()->session->get('chosen_shipping_methods');
+        if (!is_array($chosen_methods) || empty($chosen_methods)) {
+            return false;
+        }
+
+        $selected_method = null;
+        foreach ($chosen_methods as $chosen_method) {
+            if (is_string($chosen_method) && strpos($chosen_method, 'the_courier_guy') === 0) {
+                $selected_method = $chosen_method;
+                break;
+            }
+        }
+
+        if (!$selected_method) {
+            return false;
+        }
+
+        $selected_instance_id = null;
+        $parts                = explode(':', $selected_method);
+        if (count($parts) > 1) {
+            foreach (array_slice($parts, 1) as $part) {
+                if (ctype_digit((string)$part)) {
+                    $selected_instance_id = (int)$part;
+                }
+            }
+        }
+
+        $zones        = WC_Shipping_Zones::get_zones();
+        $default_zone = WC_Shipping_Zones::get_zone(0);
+        if ($default_zone) {
+            $zones[] = [
+                    'shipping_methods' => $default_zone->get_shipping_methods(true),
+            ];
+        }
+
+        foreach ($zones as $zone) {
+            if (empty($zone['shipping_methods']) || !is_array($zone['shipping_methods'])) {
+                continue;
+            }
+
+            foreach ($zone['shipping_methods'] as $method) {
+                if (!isset($method->id) || $method->id !== 'the_courier_guy') {
+                    continue;
+                }
+
+                $enabled     = $method->enabled ?? 'no';
+                $instance_id = isset($method->instance_id) ? (int)$method->instance_id : null;
+
+                if ($selected_instance_id !== null) {
+                    if ($instance_id === $selected_instance_id) {
+                        return $enabled === 'yes';
+                    }
+                    continue;
+                }
+
+                return $enabled === 'yes';
+            }
+        }
+
+        return false;
     }
 
     public function add_billing_insurance_field($fields)
@@ -429,7 +506,7 @@ class TCG_Shipping_Method extends WC_Shipping_Method
              * Store insurance selection in session for classic checkout
              */
 
-            $wc_session->set('tcg_billing_insurance', $package['insurance'] ?? false ? '1' : '0');
+            $wc_session->set('tcg_billing_insurance', ($package['insurance'] ?? false) ? '1' : '0');
         }
 
         // blocks check session for insurance
@@ -1304,26 +1381,26 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                     $this->add_rate($args);
 
                     return array(
-                        'id'   => $shippingMethodId,
-                        'free' => true,
-                        'rate' => $args,
+                            'id'   => $shippingMethodId,
+                            'free' => true,
+                            'rate' => $args,
                     );
                 } elseif (($product_free_shipping || $global_amount_free_shipping) && !in_array(
-                        $rate['service'],
-                        $rates_for_free_shipping
-                    )) {
+                                $rate['service'],
+                                $rates_for_free_shipping
+                        )) {
                     $this->add_rate($args);
 
                     return array(
-                        'id'   => $shippingMethodId,
-                        'free' => false,
-                        'rate' => $args,
+                            'id'   => $shippingMethodId,
+                            'free' => false,
+                            'rate' => $args,
                     );
                 } elseif (!($product_free_shipping || $global_amount_free_shipping)) {
                     return array(
-                        'id'   => $shippingMethodId,
-                        'free' => false,
-                        'rate' => $args,
+                            'id'   => $shippingMethodId,
+                            'free' => false,
+                            'rate' => $args,
                     );
                     $this->add_rate($args);
                 }
@@ -1342,9 +1419,9 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                 $this->add_rate($args);
 
                 return array(
-                    'id'   => $shippingMethodId,
-                    'free' => $free,
-                    'rate' => $args,
+                        'id'   => $shippingMethodId,
+                        'free' => $free,
+                        'rate' => $args,
                 );
             }
         }

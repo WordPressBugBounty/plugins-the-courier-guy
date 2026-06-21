@@ -537,11 +537,15 @@ HTML;
 
             $order->update_meta_data('_order_shipping_data', json_encode($shippingMethods));
 
-            //Loop through order shipping items
-            foreach ($order->get_items('shipping') as $item_id => $item) {
-                $item->set_method_id($shippingMethods[0]);
-                $item->save();
-                break;
+            // Only update shipping method_id if the selected method is a TCG method
+            $currentMethod = is_array($shippingMethods) ? $shippingMethods[0] : $shippingMethods;
+            if ($currentMethod && str_contains($currentMethod, 'the_courier_guy')) {
+                //Loop through order shipping items
+                foreach ($order->get_items('shipping') as $item_id => $item) {
+                    $item->set_method_id($currentMethod);
+                    $item->save();
+                    break;
+                }
             }
 
             if ($shippingExtrasCost > 0) {
@@ -640,7 +644,7 @@ HTML;
             ) {
                 $insurance = true;
             }
-            $wc_session->set('tcg_billing_insurance', $insurance);
+            $wc_session->set('tcg_billing_insurance', $insurance ? '1' : '0');
 
             $customProperties = [
                     'tcg_insurance' => $insurance,
@@ -1001,7 +1005,7 @@ HTML;
         $shippingMethodParameters = $this->getShippingMethodParameters($order);
         if ($this->hasTcgShippingMethod(
                         $order
-                ) && $shippingMethodParameters['automatically_submit_collection_order'] === 'yes') {
+                ) && (($shippingMethodParameters['automatically_submit_collection_order'] ?? 'no') === 'yes')) {
             $this->createShipment($order);
         }
     }
@@ -1511,17 +1515,60 @@ HTML;
                 $shippingMethodSettings = $settings;
             }
         } else {
-            $existingZones = WC_Shipping_Zones::get_zones();
-            foreach ($existingZones as $zone) {
-                $shippingMethods = $zone['shipping_methods'];
+            $zones       = WC_Shipping_Zones::get_zones();
+            $defaultZone = WC_Shipping_Zones::get_zone(0);
+
+            if ($defaultZone) {
+                $zones[] = [
+                        'shipping_methods' => $defaultZone->get_shipping_methods(),
+                ];
+            }
+
+            $fallbackSettings = [];
+            foreach ($zones as $zone) {
+                $shippingMethods = $zone['shipping_methods'] ?? [];
                 foreach ($shippingMethods as $shippingMethod) {
-                    if ($shippingMethod->id == 'the_courier_guy') {
-                        $courierGuyShippingMethod = $shippingMethod;
+                    if ($shippingMethod->id === 'the_courier_guy') {
+                        $instanceSettings            = $shippingMethod->instance_settings ?? [];
+                        $instanceSettings['enabled'] = $shippingMethod->enabled ?? ($instanceSettings['enabled'] ?? 'no');
+                        if (($shippingMethod->enabled ?? 'no') === 'yes') {
+                            return $instanceSettings;
+                        }
+
+                        if (empty($fallbackSettings)) {
+                            $fallbackSettings = $instanceSettings;
+                        }
                     }
                 }
             }
-            if (!empty($courierGuyShippingMethod)) {
-                $shippingMethodSettings = $courierGuyShippingMethod->instance_settings;
+
+            if (!empty($fallbackSettings)) {
+                $shippingMethodSettings = $fallbackSettings;
+            } elseif (empty($shippingMethodSettings)) {
+                global $wpdb;
+
+                $results = $wpdb->get_results(
+                        "SELECT option_name, option_value
+                     FROM {$wpdb->options}
+                     WHERE option_name LIKE 'woocommerce_the_courier_guy_%_settings'"
+                );
+
+                foreach ($results as $result) {
+                    $settings = maybe_unserialize($result->option_value);
+                    if (!is_array($settings)) {
+                        continue;
+                    }
+
+                    $settings['enabled'] = $settings['enabled'] ?? 'no';
+
+                    if (($settings['enabled'] ?? 'no') === 'yes') {
+                        return $settings;
+                    }
+
+                    if (empty($shippingMethodSettings)) {
+                        $shippingMethodSettings = $settings;
+                    }
+                }
             }
         }
 
@@ -1945,7 +1992,20 @@ HTML;
     private function getShippingMethodParameters(WC_Order $order): array
     {
         if ($this->hasTcgShippingMethod($order)) {
-            return get_option('woocommerce_the_courier_guy_' . $this->getShippingInstanceId($order) . '_settings');
+            $instanceId = $this->getShippingInstanceId($order);
+            $settings   = get_option('woocommerce_the_courier_guy_' . $instanceId . '_settings');
+
+            if (!is_array($settings)) {
+                $this->logPluginWarning(
+                        sprintf(
+                                'Missing or invalid shipping settings for instance %d on order %d. Using empty defaults.',
+                                $instanceId,
+                                $order->get_id()
+                        )
+                );
+            }
+
+            return is_array($settings) ? $settings : [];
         }
 
         return [];
@@ -1959,6 +2019,19 @@ HTML;
     private function getAccessKey(): string
     {
         return get_option(self::TCG_SHIP_LOGIC_SECRET_ACCESS_KEY);
+    }
+
+    private function logPluginWarning(string $message): void
+    {
+        try {
+            if (function_exists('wc_get_logger')) {
+                wc_get_logger()->warning($message, ['source' => 'the-courier-guy']);
+            } else {
+                error_log('[the-courier-guy] ' . $message);
+            }
+        } catch (Throwable $e) {
+            error_log('[the-courier-guy] Logging failure: ' . $e->getMessage());
+        }
     }
 
 

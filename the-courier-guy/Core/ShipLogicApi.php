@@ -20,8 +20,8 @@ use Psr\Http\Message\RequestInterface;
 class ShipLogicApi
 {
     public const BASE_URL                     = 'https://api.portal.thecourierguy.co.za/';
-    public const LEGACY_API_BASE              =  self::BASE_URL;
-    public const API_BASE                     =  self::BASE_URL . 'v2/';
+    public const LEGACY_API_BASE              = self::BASE_URL;
+    public const API_BASE                     = self::BASE_URL . 'v2/';
     const        TCG_SHIP_LOGIC_GETRATES_BODY = 'tcg_ship_logic_getrates_body';
     private string $access_key_id;
     private string $secret_access_key;
@@ -258,6 +258,7 @@ class ShipLogicApi
 
         return [];
     }
+
     public function getRatesBody(array $package, array $parameters): void
     {
         if ($wcSession = WC()->session) {
@@ -316,7 +317,6 @@ class ShipLogicApi
             }
 
             $wcSession->set(self::TCG_SHIP_LOGIC_GETRATES_BODY, $body);
-
         }
     }
 
@@ -339,6 +339,9 @@ class ShipLogicApi
         $pickupPoint = $lockerLocations['pickup_points'][0];
 
         unset($body->delivery_address);
+        // If declared value is set, no rates are returned
+        // It seems to be a bug in the API
+        unset($body->declared_value);
         $body->delivery_pickup_point_id       = $pickupPoint['pickup_point_id'];
         $body->delivery_pickup_point_provider = $pickupPoint['pickup_point_provider'];
 
@@ -494,5 +497,5 @@ class ShipLogicApi
 
 class ShipLogicApiException extends Exception
 {
-    
+
 }

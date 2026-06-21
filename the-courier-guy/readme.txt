@@ -1,9 +1,9 @@
 === The Courier Guy Shipping for WooCommerce ===
 Tags: ecommerce, e-commerce, woocommerce, shipping, courier
 Requires at least: 6.0
-Tested up to: 6.9
+Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 5.5.0
+Stable tag: 5.5.1
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -379,6 +379,13 @@ We often suggest that the clients do not exclude the following shipping methods
 
 
 == Changelog ==
+
+= 5.5.1 - June 21, 2026
+* Fixed fatal TypeError when processing orders with missing or deleted shipping zone settings.
+* Fixed TCG shipping options rendering on checkout when the shipping method is disabled.
+* Fixed critical cart and checkout errors caused by malformed shipping rate IDs containing colons.
+* Improved shipping zone settings lookup to include the default zone and fallback to a database scan.
+* Fixed order shipping item method ID being incorrectly overwritten for non-TCG shipping methods.
 
 = 5.5.0 - May 18, 2026
 * Updated 'https://api.thecourierguy.co.za/v2/' to 'https://api.portal.thecourierguy.co.za/v2/'.
