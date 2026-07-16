@@ -3,7 +3,7 @@ Tags: ecommerce, e-commerce, woocommerce, shipping, courier
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 5.5.1
+Stable tag: 5.5.2
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -379,6 +379,13 @@ We often suggest that the clients do not exclude the following shipping methods
 
 
 == Changelog ==
+
+= 5.5.2 - July 16, 2026
+* Resolved “Rate Has Expired” API error by enhancing rate validation and re-calculation logic prior to shipment creation.
+* Corrected shipment service-level selection so overnight (OVN) and other paid service codes are matched by normalised service code rather than rate name, preventing incorrect Economy (ECO) submissions.
+* Improved extraction of the selected shipping method code from three- and four-part method identifiers, order shipping metadata, and shipping titles (including locker titles).
+* Expanded door-to-locker handling to cover D2L, D2K, and D2P services and submit the resolved service level identifier when creating locker shipments.
+* Added optional diagnostic logging around shipment creation, rate refresh, and service-level matching to aid merchant support investigations.
 
 = 5.5.1 - June 21, 2026
 * Fixed fatal TypeError when processing orders with missing or deleted shipping zone settings.

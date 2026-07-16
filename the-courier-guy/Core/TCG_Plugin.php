@@ -23,7 +23,8 @@ class TCG_Plugin extends CustomPlugin
     /**
      * @var WC_Logger
      */
-    private static $log;
+    private $log;
+    private $logging;
     private $shipLogicApi;
     private $parcelPerfectApiPayload;
     /**
@@ -42,6 +43,8 @@ class TCG_Plugin extends CustomPlugin
         $this->initializeShipLogicApi();
         $this->initializeShipLogicApiPayload();
         $this->registerShippingMethod();
+        $this->log     = wc_get_logger();
+        $this->logging = $this->getLogging() === 'yes';
 
         add_action('wp_enqueue_scripts', [$this, 'registerJavascriptResources']);
         add_action('wp_enqueue_scripts', [$this, 'registerCSSResources']);
@@ -149,9 +152,9 @@ class TCG_Plugin extends CustomPlugin
             return;
         }
 
-        $instanceId        = 0;
+        $instanceId        = $this->getInstanceId() ?? 0;
         $orderShippingData = $order->get_meta("_order_shipping_data", true);
-        if (is_string($orderShippingData) && $orderShippingData != '') {
+        if ($instanceId === 0 && is_string($orderShippingData) && $orderShippingData != '') {
             $orderShippingData = json_decode($orderShippingData, true);
             if (is_array($orderShippingData) && !empty($orderShippingData)) {
                 $orderShippingData = explode(':', $orderShippingData[0]);
@@ -163,14 +166,12 @@ class TCG_Plugin extends CustomPlugin
                     }
                 }
             }
-        } else {
-            $shippingMethodID = [0, 0, 0];
         }
 
         $this->initializeShipLogicApi();
         $response = $this->shipLogicApi->makeAPIRequest(
-                'getRates',
-                ['body' => json_encode($getRatesBody)]
+            'getRates',
+            ['body' => json_encode($getRatesBody)]
         );
         $rates    = json_decode($response, true);
 
@@ -212,9 +213,9 @@ class TCG_Plugin extends CustomPlugin
         $pudo_word               = "pickup_dropoff";
 
         if (($_POST['iihtcg_selector_input'] ?? '') == 'tcg' && !str_contains(
-                        $current_shipping_method,
-                        $courier_guy_word
-                ) && !str_contains($current_shipping_method, $flatRateWord)
+                $current_shipping_method,
+                $courier_guy_word
+            ) && !str_contains($current_shipping_method, $flatRateWord)
             && !str_contains($current_shipping_method, $pudo_word)) {
             wc_add_notice(__('Please select a shipping method.', 'the-courier-guy'), 'error');
         }
@@ -223,9 +224,9 @@ class TCG_Plugin extends CustomPlugin
     public function test_ajax($fields)
     {
         $fields['ship_logic_opt_ins'] = [
-                'label'    => 'Opt Ins',
-                'required' => false,
-                'type'     => 'text',
+            'label'    => 'Opt Ins',
+            'required' => false,
+            'type'     => 'text',
         ];
 
         return $fields;
@@ -594,6 +595,8 @@ HTML;
         $order->set_total((string)($lineItemTotals + $feeItemsTotals + $shippingItemTotals));
         $order->set_shipping_total((string)$shippingItemTotals);
         $order->save();
+        $this->logging ? $this->log->info('Order updated after creation:') : '';
+        $this->logging ? $this->log->info($order) : '';
     }
 
     public function updateOrderAfterCreation(int $orderId)
@@ -610,6 +613,8 @@ HTML;
         }
 
         $order->save();
+        $this->logging ? $this->log->info('Order updated after creation:') : '';
+        $this->logging ? $this->log->info($order) : '';
     }
 
     /**
@@ -1715,6 +1720,8 @@ HTML;
         if ($this->hasTcgShippingMethod($order)) {
             $shippingMethodParameters = $this->getShippingMethodParameters($order);
             $updatedRates             = $this->recalculateShippingOnadminRecalculate($order->get_id(), true);
+            $this->logging ? $this->log->info("Updated Rates on Create Shipment: " . json_encode($updatedRates)) : null;
+
             $selectedOptIns           = $order->get_meta('tcg_selected_optins', true) ?? [];
             if (is_string($selectedOptIns) && strlen($selectedOptIns) > 0) {
                 $selectedOptIns = json_decode($selectedOptIns, true);
@@ -1728,6 +1735,8 @@ HTML;
             $getRatesBody     = $order->get_meta(ShipLogicApi::TCG_SHIP_LOGIC_GETRATES_BODY, true);
             $getRatesResult   = $order->get_meta(TCG_Shipping_Method::TCG_SHIP_LOGIC_RESULT, true);
             $service_level_id = $getRatesResult['rates']['rates'][0]['service_level']['id'];
+            $this->logging ? $this->log->info('Service Level ID from order: ' . $service_level_id) : null;
+
             $pickupPointId    = $getRatesResult['rates']['rates'][0]['service_level']['pickup_point'] ?? '';
 
             $shipping_title = "";
@@ -1742,6 +1751,27 @@ HTML;
                 if (count($shippingMethodID) === 4) {
                     $shippingMethodCode = $shippingMethodID[3];
                 }
+            } elseif (count($shippingMethodID) === 3) {
+                $shippingMethodCode = $shippingMethodID[2];
+            }
+            $this->logging ? $this->log->info('Shipping Method Code from order: ' . $shippingMethodCode) : null;
+
+            if ($shippingMethodCode === '') {
+                $shippingMethodCode = $shipping_title;
+                if (str_starts_with($shippingMethodCode, 'The Courier Guy Locker:')) {
+                    $shippingMethodCode = substr(
+                        $shippingMethodCode,
+                        strlen('The Courier Guy Locker:')
+                    );
+                } elseif (str_starts_with($shippingMethodCode, 'The Courier Guy ')) {
+                    $shippingMethodCode = substr(
+                        $shippingMethodCode,
+                        strlen('The Courier Guy ')
+                    );
+                    $shippingMethodCode = trim($shippingMethodCode);
+                    $shippingMethodCode = explode(':', $shippingMethodCode)[0];
+                    $this->logging ? $this->log->info('Shipping Method Code from title: ' . $shippingMethodCode) : null;
+                }
             }
 
             $orderShippingData = $order->get_meta("_order_shipping_data", true);
@@ -1750,25 +1780,43 @@ HTML;
                 if (is_array($orderShippingData) && !empty($orderShippingData)) {
                     $orderShippingData = explode(':', $orderShippingData[0]);
                     if (is_array($orderShippingData) && count($orderShippingData) === 4) {
-                        if ($orderShippingData[0] === 'the_courier_guy' && $orderShippingData[1] === 'The Courier Guy Locker') {
-                            $shippingMethodCode = trim($orderShippingData[2]);
-                        }
+                        $shippingMethodCode = trim($orderShippingData[2]);
                     }
                 }
             } else {
                 $shippingMethodID = [0, 0, 0];
             }
+            $this->logging ? $this->log->info('Shipping Method Code from order shipping data: ' . $shippingMethodCode)
+                : null;
 
+            $matched = false;
             foreach ($updatedRates['rates'] ?? [] as $base_rate) {
-                $rateName = $this->getRateName($base_rate);
-                $rateCode = trim($base_rate['service_level']['code']);
+                $rateCode           = trim($base_rate['service_level']['code']);
+                $rateCode           = str_replace([' ', '/'],
+                    '',
+                    $rateCode);
+                $shippingMethodCode = str_replace([' ', '/'],
+                    '',
+                    $shippingMethodCode);
 
-                if ($rateName == $shipping_title || $shippingMethodCode == $rateCode) {
+                if ($shippingMethodCode === $rateCode) {
                     $service_level_id = $base_rate['service_level']['id'];
                     if (!empty($base_rate['service_level']['pickup_point'])) {
                         $pickupPointId = $base_rate['service_level']['pickup_point'];
                     }
+                    $matched = true;
+                    $this->logging ? $this->log->info('Shipping Method Code matched: ' . $shippingMethodCode) : null;
+                    $this->logging ? $this->log->info('Service level id matched: ' . $service_level_id) : null;
+
+                    break;
                 }
+            }
+            if (!$matched) {
+                $service_level_id = $updatedRates['rates'][0]['service_level']['id'];
+                $shippingMethodCode = $updatedRates['rates'][0]['service_level']['code'];
+                $this->logging ? $this->log->info('Shipping Method Code not matched') : null;
+                $this->logging ? $this->log->info('Service Method Code selected: ' . $shippingMethodCode) : null;
+                $this->logging ? $this->log->info('Service level id selected: ' . $service_level_id) : null;
             }
 
             $createShipmentBody = new stdClass();
@@ -1780,13 +1828,18 @@ HTML;
             $collection_contact->email              = $shippingMethodParameters['shopEmail'];
             $createShipmentBody->collection_contact = $collection_contact;
 
-            $shipmentType = $shippingMethodID[2];
-            if (str_contains($shipmentType, 'D2L') && !empty($pickupPointId)) {
+            $toLockerTypes = ['D2L', 'D2K', 'D2P'];
+            $isToLocker    = false;
+            foreach ($toLockerTypes as $toLockerType) {
+                if (str_contains($shippingMethodCode, $toLockerType)) {
+                    $isToLocker = true;
+                    break;
+                }
+            }
+            if ($isToLocker && !empty($pickupPointId)) {
                 $createShipmentBody->delivery_pickup_point_provider = 'tcg-locker';
                 $createShipmentBody->delivery_pickup_point_id       = $pickupPointId;
-
-                $serviceCode                            = trim(preg_replace('/[\/\\\\].*/', '', $shipmentType));
-                $createShipmentBody->service_level_code = $serviceCode;
+                $createShipmentBody->service_level_id               = $service_level_id;
             } else {
                 $createShipmentBody->delivery_address = $getRatesBody->delivery_address;
                 $createShipmentBody->service_level_id = $service_level_id;
@@ -1794,7 +1847,7 @@ HTML;
 
             $delivery_contact                     = new stdClass();
             $delivery_contact->name               = $order->get_shipping_first_name(
-                    ) . ' ' . $order->get_shipping_last_name();
+                ) . ' ' . $order->get_shipping_last_name();
             $delivery_contact->mobile_number      = $order->get_billing_phone();
             $delivery_contact->email              = $order->get_billing_email();
             $createShipmentBody->delivery_contact = $delivery_contact;
@@ -1896,6 +1949,45 @@ HTML;
         }
 
         return $parcels;
+    }
+
+    public function getInstanceId()
+    {
+        $instanceId = 0;
+        $instances  = [];
+
+        foreach (WC_Shipping_Zones::get_zones() as $zone) {
+            foreach ($zone['shipping_methods'] as $method) {
+                if ($method->id === 'the_courier_guy') {
+                    $instances[] = [
+                        'zone_id'     => $zone['id'],
+                        'zone_name'   => $zone['zone_name'],
+                        'instance_id' => $method->instance_id,
+                        'enabled'     => $method->enabled,
+                        'title'       => $method->title,
+                    ];
+                }
+            }
+        }
+        $zone = new WC_Shipping_Zone(0);
+
+        foreach ($zone->get_shipping_methods() as $method) {
+            if ($method->id === 'the_courier_guy') {
+                $instances[] = [
+                    'zone_id'     => 0,
+                    'zone_name'   => 'Rest of the world',
+                    'instance_id' => $method->instance_id,
+                    'enabled'     => $method->enabled,
+                    'title'       => $method->title,
+                ];
+            }
+        }
+
+        if (!empty($instances)) {
+            $instanceId = $instances[0]['instance_id'];
+        }
+
+        return $instanceId;
     }
 
     /**
