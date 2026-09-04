@@ -1354,12 +1354,6 @@ HTML;
             $name .= $base_rate['time_based_rate_adjustments'][0]['name'];
         } elseif (!empty($base_rate['rate_adjustments'])) {
             $name .= $base_rate['rate_adjustments'][0]['name'];
-        } else {
-            $name .= 'Fuel charge';
-        }
-
-        if (str_contains($name, 'D2L')) {
-            $name = str_replace(': Fuel charge', '', $name);
         }
 
         return $name;

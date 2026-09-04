@@ -637,9 +637,9 @@ class TCG_Shipping_Method extends WC_Shipping_Method
                         }
 
                         if (str_starts_with($base_rate['service_level']['code'], 'D2L')) {
-                            $name = 'The Courier Guy Locker: ' . $base_rate['service_level']['code'] . '';
+                            $name = 'The Courier Guy Locker: ' . $base_rate['service_level']['code'];
                         } else {
-                            $name = 'The Courier Guy ' . $base_rate['service_level']['code'] . ': Fuel charge';
+                            $name = 'The Courier Guy - ' . $base_rate['service_level']['code'];
                         }
 
                         $insurance_charge = 0;
@@ -1963,26 +1963,31 @@ class TCG_Shipping_Method extends WC_Shipping_Method
     {
         //@todo The contents of this method is legacy code from an older version of the plugin.
         $rateOptions        = new stdClass();
-        $rateOptions->AIR   = "The Courier Guy AIR: Fuel charge";
-        $rateOptions->ECO   = "The Courier Guy ECO: Fuel charge";
-        $rateOptions->ECOR  = "The Courier Guy ECOR: Fuel charge";
-        $rateOptions->ECOB  = "The Courier Guy ECOB: Fuel charge";
-        $rateOptions->ECORB = "The Courier Guy ECORB: Fuel charge";
-        $rateOptions->IND   = "The Courier Guy IND: Fuel charge";
-        $rateOptions->INN   = "The Courier Guy INN: Fuel charge";
-        $rateOptions->LLS   = "The Courier Guy LLS: Fuel charge";
-        $rateOptions->LLX   = "The Courier Guy LLX: Fuel charge";
-        $rateOptions->LOF   = "The Courier Guy LOF: Fuel charge";
-        $rateOptions->LOX   = "The Courier Guy LOX: Fuel charge";
-        $rateOptions->LSE   = "The Courier Guy LSE: Fuel charge";
-        $rateOptions->LSF   = "The Courier Guy LSF: Fuel charge";
-        $rateOptions->LSX   = "The Courier Guy LSX: Fuel charge";
-        $rateOptions->NFS   = "The Courier Guy NFS: Fuel charge";
-        $rateOptions->OVN   = "The Courier Guy OVN: Fuel charge";
-        $rateOptions->OVNR  = "The Courier Guy OVNR: Fuel charge";
-        $rateOptions->RIN   = "The Courier Guy RIN: Fuel charge";
-        $rateOptions->SDX   = "The Courier Guy SDX: Fuel charge";
-        $rateOptions->SPX   = "The Courier Guy SPX: Fuel charge";
+        $rateOptions->AIR   = "The Courier Guy - AIR";
+        $rateOptions->ECO   = "The Courier Guy - ECO";
+        $rateOptions->ECOR  = "The Courier Guy - ECOR";
+        $rateOptions->ECOB  = "The Courier Guy - ECOB";
+        $rateOptions->ECORB = "The Courier Guy - ECORB";
+        $rateOptions->IND   = "The Courier Guy - IND";
+        $rateOptions->INN   = "The Courier Guy - INN";
+        $rateOptions->LLS   = "The Courier Guy - LLS";
+        $rateOptions->LLX   = "The Courier Guy - LLX";
+        $rateOptions->LOF   = "The Courier Guy - LOF";
+        $rateOptions->LPF   = "The Courier Guy - LPF";
+        $rateOptions->LOX   = "The Courier Guy - LOX";
+        $rateOptions->LPP   = "The Courier Guy - LPP";
+        $rateOptions->LSE   = "The Courier Guy - LSE";
+        $rateOptions->LSP   = "The Courier Guy - LSP";
+        $rateOptions->LSF   = "The Courier Guy - LSF";
+        $rateOptions->LSX   = "The Courier Guy - LSX";
+        $rateOptions->NFS   = "The Courier Guy - NFS";
+        $rateOptions->OVN   = "The Courier Guy - OVN";
+        $rateOptions->PRI   = "The Courier Guy - PRI";
+        $rateOptions->OVNR  = "The Courier Guy - OVNR";
+        $rateOptions->PRIR  = "The Courier Guy - PRIR";
+        $rateOptions->RIN   = "The Courier Guy - RIN";
+        $rateOptions->SDX   = "The Courier Guy - SDX";
+        $rateOptions->SPX   = "The Courier Guy - SPX";
 
         return $rateOptions;
     }

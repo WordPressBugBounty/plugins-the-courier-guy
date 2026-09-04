@@ -4,7 +4,7 @@
  * Description: The Courier Guy WP & Woocommerce Shipping functionality.
  * Author: The Courier Guy
  * Author URI: https://www.thecourierguy.co.za/
- * Version: 5.5.2
+ * Version: 5.5.3
  * Plugin Slug: wp-plugin-the-courier-guy
  * Text Domain: the-courier-guy
  * WC requires at least: 9.0
