@@ -3,7 +3,7 @@ Tags: ecommerce, e-commerce, woocommerce, shipping, courier
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 5.5.3
+Stable tag: 5.5.4
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -189,6 +189,9 @@ There are three The Courier Guy specific settings in product settings
 - Always pack as a single parcel - if enabled, each item of such a product will be a single parcel
 
 == Changelog ==
+
+= 5.5.4 - September 8, 2026
+* Fixed plugin activation on some case-sensitive hosts.
 
 = 5.5.3 - September 3, 2026
 * Added new courier service level codes: LPP, LPF, PRI, PRIR and LSP.

@@ -4,7 +4,7 @@
  * Description: The Courier Guy WP & Woocommerce Shipping functionality.
  * Author: The Courier Guy
  * Author URI: https://www.thecourierguy.co.za/
- * Version: 5.5.3
+ * Version: 5.5.4
  * Plugin Slug: wp-plugin-the-courier-guy
  * Text Domain: the-courier-guy
  * WC requires at least: 9.0
@@ -117,7 +117,24 @@ function htaccess_protect()
 {
     $plugin_dir = dirname(__FILE__);
     $htaccess   = $plugin_dir . '/.htaccess.setup';
-    $target     = dirname(__DIR__, 2) . '/Uploads/the-courier-guy/.htaccess';
+    $upload_dir = wp_upload_dir();
+
+    $directory = $upload_dir['basedir'] . '/the-courier-guy';
+    $target    = $directory . '/.htaccess';
+
+    if (!is_dir($directory) && !wp_mkdir_p($directory)) {
+        return new WP_Error(
+            'mkdir_failed',
+            'Could not create upload directory.'
+        );
+    }
+
+    if (!file_exists($target) && file_put_contents($target, "") === false) {
+        return new WP_Error(
+            'file_failed',
+            'Could not create .htaccess file.'
+        );
+    }
     copy($htaccess, $target);
 }
 
